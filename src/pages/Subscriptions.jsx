@@ -306,7 +306,16 @@ export default function Subscriptions() {
     return sorted
   }
 
-  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+  const formatDate = (d) => {
+    if (!d) return '—'
+    // Parse YYYY-MM-DD directly to avoid timezone shifting issues
+    const parts = d.toString().split('T')[0].split('-')
+    if (parts.length === 3) {
+      const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    }
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
 
   // ─── CATEGORY VIEW ───
   const renderCategoryView = () => {

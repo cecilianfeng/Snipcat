@@ -159,6 +159,13 @@ const Dashboard = () => {
               <Download className="w-4 h-4" />
               Export CSV
             </button>
+            <Link
+              to="/subscriptions?add=1"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Add Manually
+            </Link>
             <button className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 font-medium">
               <Mail className="w-4 h-4" />
               Scan Inbox

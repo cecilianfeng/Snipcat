@@ -371,9 +371,13 @@ export default function Subscriptions() {
                         onClick={() => toggleExpanded(item.id)}
                         className={`w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors ${isCancelled ? 'opacity-50' : ''}`}
                       >
-                        <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
-                          {item.name?.charAt(0).toUpperCase()}
-                        </div>
+                        {item.logo_url ? (
+                          <img src={item.logo_url} alt={item.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                            {item.name?.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div className="flex-1 text-left min-w-0">
                           <p className={`font-medium text-gray-900 ${isCancelled ? 'line-through text-gray-500' : ''}`}>
                             {item.name}
@@ -457,9 +461,13 @@ export default function Subscriptions() {
       <div className="space-y-2">
         {sortedAll.map(item => (
           <div key={item.id} className={`bg-white border border-gray-200 rounded-lg px-5 py-4 flex items-center gap-4 ${item.status === 'cancelled' ? 'opacity-50' : ''}`}>
-            <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
-              {item.name?.charAt(0).toUpperCase()}
-            </div>
+            {item.logo_url ? (
+              <img src={item.logo_url} alt={item.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                {item.name?.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className={`font-medium text-gray-900 ${item.status === 'cancelled' ? 'line-through' : ''}`}>{item.name}</p>
               <p className="text-sm text-gray-500 capitalize">{CATEGORIES[item.category]?.label || 'Other'}</p>

@@ -420,15 +420,20 @@ export default function Landing() {
           <Link to="/" className="flex items-center gap-1.5 font-bold text-gray-900">
             <CatLogo size={30} /> SnipKitty
           </Link>
-          <Link to="/login">
-            <motion.span
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.97 }}
-                className="inline-block px-5 py-2 text-sm font-semibold rounded-full bg-[#F97316] text-white hover:bg-[#EA580C] transition-colors"
-            >
-              Get Started
-            </motion.span>
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+              Log In
+            </Link>
+            <Link to="/login">
+              <motion.span
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                  className="inline-block px-5 py-2 text-sm font-semibold rounded-full bg-[#F97316] text-white hover:bg-[#EA580C] transition-colors"
+              >
+                Get Started
+              </motion.span>
+            </Link>
+          </div>
         </div>
       </motion.nav>
 

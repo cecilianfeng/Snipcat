@@ -1,5 +1,6 @@
-import { NavLink } from 'react-router-dom'
-import { Home, Package, Bell, Settings } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { Home, Package, Bell, Settings, LogOut } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const CatLogo = () => (
   <svg viewBox="0 0 58 42" fill="none" className="w-9 h-7">
@@ -21,12 +22,30 @@ const CatLogo = () => (
 )
 
 export default function Sidebar() {
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/subscriptions', label: 'Subscriptions', icon: Package },
     { path: '/reminders', label: 'Reminders', icon: Bell },
     { path: '/settings', label: 'Settings', icon: Settings },
   ]
+
+  // Get user display info from Google auth metadata
+  const fullName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
+  const avatarUrl = user?.user_metadata?.avatar_url
+  const initials = fullName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/')
+  }
 
   return (
     <div className="w-64 h-screen bg-gray-900 text-white flex flex-col">
@@ -57,14 +76,32 @@ export default function Sidebar() {
       </nav>
 
       {/* User Profile Section */}
-      <div className="border-t border-white/10 p-6 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center font-semibold text-white text-sm">
-          CC
+      <div className="border-t border-white/10 p-4">
+        <div className="flex items-center gap-3 px-2 py-2">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={fullName}
+              className="w-10 h-10 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center font-semibold text-white text-sm">
+              {initials}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate">{fullName}</p>
+            <p className="text-xs text-white/60">Free Plan</p>
+          </div>
         </div>
-        <div className="flex-1">
-          <p className="font-medium">CC</p>
-          <p className="text-xs text-white/60">Pro Plan</p>
-        </div>
+        <button
+          onClick={handleSignOut}
+          className="mt-2 w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-white/50 hover:text-white hover:bg-white/5 transition-colors text-sm"
+        >
+          <LogOut size={16} />
+          <span>Sign Out</span>
+        </button>
       </div>
     </div>
   )

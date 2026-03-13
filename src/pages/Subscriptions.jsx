@@ -1,497 +1,507 @@
-import React, { useState } from 'react';
-import { Filter, Plus, ChevronDown, Lightbulb, Play, ClipboardCheck, Cloud, Ban } from 'lucide-react';
+import { useState, useEffect } from 'react'
+import { Filter, Plus, ChevronDown, X } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import {
+  getSubscriptions,
+  createSubscription,
+  updateSubscription,
+  deleteSubscription,
+  CATEGORIES,
+  groupByCategory,
+} from '../lib/subscriptions'
 
+// ─── ADD / EDIT MODAL ───
+function SubscriptionModal({ isOpen, onClose, onSave, editData }) {
+  const [form, setForm] = useState({
+    name: '',
+    category: 'other',
+    amount: '',
+    currency: 'USD',
+    billing_cycle: 'monthly',
+    next_billing_date: '',
+    status: 'active',
+    notes: '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (editData) {
+      setForm({
+        name: editData.name || '',
+        category: editData.category || 'other',
+        amount: editData.amount?.toString() || '',
+        currency: editData.currency || 'USD',
+        billing_cycle: editData.billing_cycle || 'monthly',
+        next_billing_date: editData.next_billing_date || '',
+        status: editData.status || 'active',
+        notes: editData.notes || '',
+      })
+    } else {
+      setForm({
+        name: '', category: 'other', amount: '', currency: 'USD',
+        billing_cycle: 'monthly', next_billing_date: '', status: 'active', notes: '',
+      })
+    }
+  }, [editData, isOpen])
+
+  if (!isOpen) return null
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await onSave({
+        ...form,
+        amount: parseFloat(form.amount) || 0,
+        next_billing_date: form.next_billing_date || null,
+      })
+      onClose()
+    } catch (err) {
+      console.error('Save failed:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">
+            {editData ? 'Edit Subscription' : 'Add Subscription'}
+          </h2>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Name</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Netflix, Spotify, Claude..."
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F97316] focus:border-transparent"
+            />
+          </div>
+
+          {/* Category + Billing Cycle */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+              <select
+                value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F97316] bg-white"
+              >
+                {Object.entries(CATEGORIES).map(([key, { label }]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Billing Cycle</label>
+              <select
+                value={form.billing_cycle}
+                onChange={e => setForm(f => ({ ...f, billing_cycle: e.target.value }))}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F97316] bg-white"
+              >
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Amount + Currency */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                placeholder="9.99"
+                value={form.amount}
+                onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Currency</label>
+              <select
+                value={form.currency}
+                onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F97316] bg-white"
+              >
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (\u20ac)</option>
+                <option value="GBP">GBP (\u00a3)</option>
+                <option value="CNY">CNY (\u00a5)</option>
+                <option value="JPY">JPY (\u00a5)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Next Billing Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Next Billing Date</label>
+            <input
+              type="date"
+              value={form.next_billing_date}
+              onChange={e => setForm(f => ({ ...f, next_billing_date: e.target.value }))}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+            />
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+            <div className="flex gap-2">
+              {['active', 'paused', 'cancelled'].map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, status: s }))}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
+                    form.status === s
+                      ? 'bg-[#F97316] text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Notes (optional)</label>
+            <textarea
+              rows={2}
+              placeholder="Any notes about this subscription..."
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F97316] resize-none"
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 px-4 py-2.5 bg-[#F97316] text-white rounded-lg font-medium hover:bg-[#EA580C] transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : editData ? 'Save Changes' : 'Add Subscription'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── MAIN PAGE ───
 export default function Subscriptions() {
-  const [activeView, setActiveView] = useState('by-category');
-  const [expandedItems, setExpandedItems] = useState({});
-  const [sortBy, setSortBy] = useState('price-high');
+  const { user } = useAuth()
+  const [subscriptions, setSubscriptions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [activeView, setActiveView] = useState('by-category')
+  const [sortBy, setSortBy] = useState('price-high')
+  const [expandedItems, setExpandedItems] = useState({})
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingSub, setEditingSub] = useState(null)
 
-  const categories = [
-    {
-      name: 'AI Tools',
-      icon: 'Lightbulb',
-      color: 'bg-purple-100',
-      iconColor: 'text-purple-600',
-      total: 310,
-      count: 3,
-      items: [
-        {
-          name: 'Claude MAX',
-          provider: 'Anthropic · Monthly',
-          price: 100,
-          renewal: 'Mar 14, 2026',
-          status: 'active',
-          color: 'bg-amber-100',
-          textColor: 'text-amber-700',
-          initial: 'C',
-          spent1y: 1200,
-          spent2y: 2400,
-          spentAll: 2400,
-          started: 'Mar 14, 2024',
-          payment: 'Visa •••• 4242',
-          priceAlert: null,
-        },
-        {
-          name: 'Cursor',
-          provider: 'MAX Plan · Monthly',
-          price: 200,
-          renewal: 'Apr 5, 2026',
-          status: 'review',
-          color: 'bg-indigo-100',
-          textColor: 'text-indigo-600',
-          initial: 'C',
-          spent1y: 2400,
-          spent2y: 3600,
-          spentAll: 3600,
-          started: 'Jun 10, 2024',
-          payment: 'Visa •••• 4242',
-          priceAlert: 'Price increased from $100 → $200 in Oct',
-        },
-        {
-          name: 'ChatGPT Plus',
-          provider: 'Individual · Monthly',
-          price: 20,
-          renewal: 'Mar 22, 2026',
-          status: 'active',
-          color: 'bg-teal-100',
-          textColor: 'text-teal-600',
-          initial: 'G',
-          spent1y: 240,
-          spent2y: 480,
-          spentAll: 480,
-          started: 'Mar 22, 2024',
-          payment: 'Visa •••• 4242',
-          priceAlert: null,
-        },
-      ],
-    },
-    {
-      name: 'Entertainment',
-      icon: 'Play',
-      color: 'bg-red-100',
-      iconColor: 'text-red-500',
-      total: 39.98,
-      count: 2,
-      items: [
-        {
-          name: 'Netflix',
-          provider: 'Premium Plan · Monthly',
-          price: 22.99,
-          renewal: 'Mar 18, 2026',
-          status: 'active',
-          color: 'bg-red-100',
-          textColor: 'text-red-600',
-          initial: 'N',
-          spent1y: 275.88,
-          spent2y: 527.76,
-          spentAll: 827.64,
-          started: 'Jan 5, 2023',
-          payment: 'Visa •••• 4242',
-          priceAlert: 'Price went up: $15.99 → $22.99 in Oct',
-        },
-        {
-          name: 'Spotify',
-          provider: 'Family Plan · Monthly',
-          price: 16.99,
-          renewal: 'Mar 15, 2026',
-          status: 'active',
-          color: 'bg-green-100',
-          textColor: 'text-green-600',
-          initial: 'S',
-          spent1y: 203.88,
-          spent2y: null,
-          spentAll: 611.64,
-          started: 'Aug 1, 2023',
-          payment: 'Visa •••• 4242',
-          priceAlert: null,
-        },
-      ],
-    },
-    {
-      name: 'Productivity',
-      icon: 'ClipboardCheck',
-      color: 'bg-blue-100',
-      iconColor: 'text-blue-600',
-      total: 20,
-      count: 2,
-      items: [
-        {
-          name: 'Notion',
-          provider: 'Plus Plan · Monthly',
-          price: 10,
-          renewal: 'Apr 1, 2026',
-          status: 'active',
-          color: 'bg-gray-100',
-          textColor: 'text-gray-700',
-          initial: 'N',
-          spent1y: 120,
-          spent2y: 240,
-          spentAll: 240,
-          started: 'Apr 1, 2024',
-          payment: 'Visa •••• 4242',
-          priceAlert: null,
-        },
-        {
-          name: 'GitHub Copilot',
-          provider: 'Individual · Monthly',
-          price: 10,
-          renewal: 'Mar 28, 2026',
-          status: 'active',
-          color: 'bg-purple-100',
-          textColor: 'text-purple-600',
-          initial: 'G',
-          spent1y: 120,
-          spent2y: 120,
-          spentAll: 120,
-          started: 'Mar 28, 2025',
-          payment: 'Visa •••• 4242',
-          priceAlert: null,
-        },
-      ],
-    },
-    {
-      name: 'Cloud Storage',
-      icon: 'Cloud',
-      color: 'bg-sky-100',
-      iconColor: 'text-sky-600',
-      total: 2.99,
-      count: 1,
-      items: [
-        {
-          name: 'iCloud+',
-          provider: '200GB · Monthly',
-          price: 2.99,
-          renewal: 'Mar 30, 2026',
-          status: 'active',
-          color: 'bg-sky-100',
-          textColor: 'text-sky-600',
-          initial: 'i',
-          spent1y: 35.88,
-          spent2y: 71.76,
-          spentAll: 71.76,
-          started: 'Mar 30, 2024',
-          payment: 'Visa •••• 4242',
-          priceAlert: null,
-        },
-      ],
-    },
-    {
-      name: 'Cancelled',
-      icon: 'Ban',
-      color: 'bg-gray-100',
-      iconColor: 'text-gray-400',
-      total: 54.99,
-      count: 1,
-      isCancelled: true,
-      items: [
-        {
-          name: 'Adobe Creative Cloud',
-          provider: 'All Apps · Monthly',
-          price: 54.99,
-          renewal: 'Feb 20, 2026',
-          status: 'cancelled',
-          color: 'bg-red-100',
-          textColor: 'text-red-400',
-          initial: 'A',
-          spent1y: 659.88,
-          spent2y: 1319.76,
-          spentAll: 1319.76,
-          started: 'Feb 20, 2022',
-          payment: 'Visa •••• 4242',
-          priceAlert: null,
-        },
-      ],
-    },
-  ];
+  useEffect(() => {
+    if (!user) return
+    loadData()
+  }, [user])
 
-  const iconMap = {
-    Lightbulb: Lightbulb,
-    Play: Play,
-    ClipboardCheck: ClipboardCheck,
-    Cloud: Cloud,
-    Ban: Ban,
-  };
+  const loadData = async () => {
+    try {
+      const data = await getSubscriptions(user.id)
+      setSubscriptions(data)
+    } catch (err) {
+      console.error('Failed to load:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const toggleExpanded = (itemName) => {
-    setExpandedItems((prev) => ({
-      ...prev,
-      [itemName]: !prev[itemName],
-    }));
-  };
+  const handleSave = async (formData) => {
+    if (editingSub) {
+      await updateSubscription(editingSub.id, formData)
+    } else {
+      await createSubscription({ ...formData, user_id: user.id })
+    }
+    await loadData()
+    setEditingSub(null)
+  }
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this subscription?')) return
+    await deleteSubscription(id)
+    await loadData()
+  }
+
+  const openEdit = (sub) => {
+    setEditingSub(sub)
+    setModalOpen(true)
+  }
+
+  const openAdd = () => {
+    setEditingSub(null)
+    setModalOpen(true)
+  }
+
+  const toggleExpanded = (id) => {
+    setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }))
+  }
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-700';
-      case 'review':
-        return 'bg-orange-100 text-orange-700';
-      case 'cancelled':
-        return 'bg-gray-200 text-gray-600';
-      default:
-        return 'bg-gray-100 text-gray-600';
+      case 'active': return 'bg-green-100 text-green-700'
+      case 'paused': return 'bg-orange-100 text-orange-700'
+      case 'cancelled': return 'bg-gray-200 text-gray-600'
+      default: return 'bg-gray-100 text-gray-600'
     }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'active':
-        return 'Active';
-      case 'review':
-        return 'Review';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  };
+  }
 
   const getSortedItems = (items) => {
-    const sorted = [...items];
-    if (sortBy === 'price-high') {
-      return sorted.sort((a, b) => b.price - a.price);
-    } else if (sortBy === 'price-low') {
-      return sorted.sort((a, b) => a.price - b.price);
-    } else if (sortBy === 'renewal') {
-      return sorted.sort((a, b) => new Date(a.renewal) - new Date(b.renewal));
-    } else if (sortBy === 'name') {
-      return sorted.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return sorted;
-  };
+    const sorted = [...items]
+    if (sortBy === 'price-high') return sorted.sort((a, b) => b.amount - a.amount)
+    if (sortBy === 'price-low') return sorted.sort((a, b) => a.amount - b.amount)
+    if (sortBy === 'renewal') return sorted.sort((a, b) => new Date(a.next_billing_date || '2999') - new Date(b.next_billing_date || '2999'))
+    if (sortBy === 'name') return sorted.sort((a, b) => a.name.localeCompare(b.name))
+    return sorted
+  }
 
+  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+
+  // ─── CATEGORY VIEW ───
   const renderCategoryView = () => {
+    const groups = groupByCategory(subscriptions)
+    const categoryEntries = Object.entries(groups)
+
+    if (categoryEntries.length === 0) {
+      return (
+        <div className="text-center py-16 text-gray-500">
+          No subscriptions yet. Click "Add Manually" to get started.
+        </div>
+      )
+    }
+
     return (
       <div className="space-y-8">
-        {categories.map((category) => {
-          const IconComponent = iconMap[category.icon];
-          const sortedItems = getSortedItems(category.items);
-          const isCancelled = category.isCancelled;
+        {categoryEntries.map(([catKey, items]) => {
+          const catConfig = CATEGORIES[catKey] || CATEGORIES.other
+          const sortedItems = getSortedItems(items)
+          const catTotal = items.filter(s => s.status === 'active').reduce((s, i) => s + Number(i.amount), 0)
 
           return (
-            <div key={category.name} className="space-y-4">
-              {/* Category Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`${category.color} ${category.iconColor} p-2 rounded-lg`}>
-                    <IconComponent size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{category.name}</h3>
-                    <p className="text-sm text-gray-600">
-                      {category.count} subscription{category.count !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <div className="ml-4">
-                    {isCancelled ? (
-                      <p className="text-sm font-medium text-green-600">
-                        You saved ${category.total}/mo
-                      </p>
-                    ) : (
-                      <p className="text-sm font-semibold text-gray-900">
-                        ${category.total.toFixed(2)}/mo
-                      </p>
-                    )}
-                  </div>
+            <div key={catKey} className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className={`${catConfig.color} ${catConfig.textColor} p-2 rounded-lg`}>
+                  <div className="w-5 h-5 rounded-full border-2 border-current" />
                 </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{catConfig.label}</h3>
+                  <p className="text-sm text-gray-600">{items.length} subscription{items.length !== 1 ? 's' : ''}</p>
+                </div>
+                <p className="ml-4 text-sm font-semibold text-gray-900">${catTotal.toFixed(2)}/mo</p>
               </div>
 
-              {/* Subscription Items */}
               <div className="space-y-2">
-                {sortedItems.map((item) => {
-                  const isExpanded = expandedItems[item.name];
+                {sortedItems.map(item => {
+                  const isExpanded = expandedItems[item.id]
+                  const isCancelled = item.status === 'cancelled'
 
                   return (
-                    <div key={item.name} className="border border-gray-200 rounded-lg overflow-hidden">
-                      {/* Collapsed View */}
+                    <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
                       <button
-                        onClick={() => toggleExpanded(item.name)}
-                        className={`w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors ${
-                          isCancelled ? 'opacity-50' : ''
-                        }`}
+                        onClick={() => toggleExpanded(item.id)}
+                        className={`w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors ${isCancelled ? 'opacity-50' : ''}`}
                       >
-                        {/* Icon Circle */}
-                        <div
-                          className={`${item.color} ${item.textColor} w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0`}
-                        >
-                          {item.initial}
+                        <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                          {item.name?.charAt(0).toUpperCase()}
                         </div>
-
-                        {/* Name & Provider */}
                         <div className="flex-1 text-left min-w-0">
-                          <p
-                            className={`font-medium text-gray-900 ${
-                              isCancelled ? 'line-through text-gray-500' : ''
-                            }`}
-                          >
+                          <p className={`font-medium text-gray-900 ${isCancelled ? 'line-through text-gray-500' : ''}`}>
                             {item.name}
                           </p>
-                          <p className="text-sm text-gray-600">{item.provider}</p>
+                          <p className="text-sm text-gray-600 capitalize">{item.billing_cycle}</p>
                         </div>
-
-                        {/* Renewal Date */}
                         <div className="text-sm text-gray-600 min-w-max">
                           <p className="text-xs text-gray-500">Renews</p>
-                          <p className="font-medium">{item.renewal}</p>
+                          <p className="font-medium">{formatDate(item.next_billing_date)}</p>
                         </div>
-
-                        {/* Price */}
                         <div className="text-right min-w-max">
-                          <p className="text-lg font-semibold text-gray-900">
-                            ${item.price.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-gray-500">monthly</p>
+                          <p className="text-lg font-semibold text-gray-900">${Number(item.amount).toFixed(2)}</p>
+                          <p className="text-xs text-gray-500">{item.billing_cycle}</p>
                         </div>
-
-                        {/* Status Badge */}
-                        <div
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                            item.status
-                          )}`}
-                        >
-                          {getStatusText(item.status)}
+                        <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
+                          {item.status}
                         </div>
-
-                        {/* Chevron */}
                         <ChevronDown
                           size={20}
-                          className={`text-gray-400 flex-shrink-0 transition-transform ${
-                            isExpanded ? 'rotate-180' : ''
-                          }`}
+                          className={`text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                         />
                       </button>
 
-                      {/* Expanded View */}
                       {isExpanded && (
                         <div className="border-t border-gray-200 bg-gray-50 px-5 py-6">
-                          <div className="grid grid-cols-3 gap-6">
-                            {/* Total Spent Panel */}
-                            <div className="bg-white rounded-xl p-5">
-                              <h4 className="text-sm font-semibold text-gray-900 mb-4">
-                                Total Spent
-                              </h4>
-                              <div className="space-y-3">
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Past 1 Year</p>
-                                  <p className="text-xl font-bold text-gray-900">
-                                    ${item.spent1y.toFixed(2)}
-                                  </p>
-                                </div>
-                                {item.spent2y && (
-                                  <div>
-                                    <p className="text-xs text-gray-600 mb-1">Past 2 Years</p>
-                                    <p className="text-xl font-bold text-gray-900">
-                                      ${item.spent2y.toFixed(2)}
-                                    </p>
-                                  </div>
-                                )}
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">All Time</p>
-                                  <p className="text-xl font-bold text-gray-900">
-                                    ${item.spentAll.toFixed(2)}
-                                  </p>
-                                </div>
-                              </div>
+                          <div className="grid grid-cols-2 gap-6 mb-4">
+                            <div>
+                              <p className="text-xs text-gray-600 mb-1">Start Date</p>
+                              <p className="text-sm font-medium text-gray-900">{formatDate(item.start_date)}</p>
                             </div>
-
-                            {/* Monthly History Panel */}
-                            <div className="bg-white rounded-xl p-5">
-                              <h4 className="text-sm font-semibold text-gray-900 mb-4">
-                                Monthly History
-                              </h4>
-                              <div className="flex items-end gap-1 h-24 mb-4">
-                                {[0.6, 0.4, 0.8, 1, 0.9, 0.7, 0.5, 0.95, 0.65, 0.85, 0.75, 1].map(
-                                  (height, idx) => (
-                                    <div
-                                      key={idx}
-                                      className="flex-1 bg-orange-400 rounded-sm"
-                                      style={{ height: `${height * 100}%`, minHeight: '4px' }}
-                                    />
-                                  )
-                                )}
-                              </div>
-                              {item.priceAlert && (
-                                <p className="text-xs text-red-600 font-medium">{item.priceAlert}</p>
-                              )}
+                            <div>
+                              <p className="text-xs text-gray-600 mb-1">Currency</p>
+                              <p className="text-sm font-medium text-gray-900">{item.currency}</p>
                             </div>
-
-                            {/* Details & Actions Panel */}
-                            <div className="bg-white rounded-xl p-5">
-                              <h4 className="text-sm font-semibold text-gray-900 mb-4">Details</h4>
-                              <div className="space-y-3 mb-4">
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Started</p>
-                                  <p className="text-sm font-medium text-gray-900">{item.started}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Billing Cycle</p>
-                                  <p className="text-sm font-medium text-gray-900">Monthly</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Payment Method</p>
-                                  <p className="text-sm font-medium text-gray-900">{item.payment}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Status</p>
-                                  <p className="text-sm font-medium text-gray-900">
-                                    {getStatusText(item.status)}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                {item.status !== 'cancelled' && (
-                                  <>
-                                    {item.status === 'active' && (
-                                      <button className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                                        Mark as Review
-                                      </button>
-                                    )}
-                                    <button className="flex-1 px-3 py-2 text-xs font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors">
-                                      Cancel
-                                    </button>
-                                  </>
-                                )}
-                              </div>
+                          </div>
+                          {item.notes && (
+                            <div className="mb-4">
+                              <p className="text-xs text-gray-600 mb-1">Notes</p>
+                              <p className="text-sm text-gray-900">{item.notes}</p>
                             </div>
+                          )}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                            >
+                              Edit
+                            </button>
+                            {item.status !== 'cancelled' && (
+                              <button
+                                onClick={() => handleSave({ ...item, status: 'cancelled' })}
+                                className="px-4 py-2 text-sm font-medium text-orange-600 border border-orange-300 rounded-lg hover:bg-orange-50 transition-colors"
+                              >
+                                Cancel Sub
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              className="px-4 py-2 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
                       )}
                     </div>
-                  );
+                  )
                 })}
               </div>
             </div>
-          );
+          )
         })}
       </div>
-    );
-  };
+    )
+  }
 
+  // ─── ALL LIST VIEW ───
   const renderAllListView = () => {
-    const allItems = categories.flatMap((cat) =>
-      cat.items.map((item) => ({ ...item, category: cat.name }))
-    );
+    const sortedAll = getSortedItems(subscriptions)
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <p className="text-gray-600">All subscriptions list view - {allItems.length} total items</p>
+      <div className="space-y-2">
+        {sortedAll.map(item => (
+          <div key={item.id} className={`bg-white border border-gray-200 rounded-lg px-5 py-4 flex items-center gap-4 ${item.status === 'cancelled' ? 'opacity-50' : ''}`}>
+            <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+              {item.name?.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`font-medium text-gray-900 ${item.status === 'cancelled' ? 'line-through' : ''}`}>{item.name}</p>
+              <p className="text-sm text-gray-500 capitalize">{CATEGORIES[item.category]?.label || 'Other'}</p>
+            </div>
+            <div className="text-sm text-gray-600">{formatDate(item.next_billing_date)}</div>
+            <div className="font-semibold text-gray-900">${Number(item.amount).toFixed(2)}</div>
+            <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
+              {item.status}
+            </div>
+            <button onClick={() => openEdit(item)} className="text-sm text-[#F97316] font-medium hover:underline">Edit</button>
+          </div>
+        ))}
       </div>
-    );
-  };
+    )
+  }
 
+  // ─── SPENDING VIEW ───
   const renderSpendingView = () => {
-    const totalMonthly = categories.reduce((sum, cat) => sum + cat.total, 0);
+    const activeItems = subscriptions.filter(s => s.status === 'active')
+    const monthlyTotal = activeItems.reduce((sum, s) => sum + Number(s.amount), 0)
+    const yearlyEstimate = monthlyTotal * 12
+
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <p className="text-gray-600">
-          Spending analysis - Total monthly: ${totalMonthly.toFixed(2)}
-        </p>
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <p className="text-sm text-gray-600 mb-1">Monthly Total</p>
+            <p className="text-3xl font-bold text-gray-900">${monthlyTotal.toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <p className="text-sm text-gray-600 mb-1">Yearly Estimate</p>
+            <p className="text-3xl font-bold text-gray-900">${yearlyEstimate.toFixed(2)}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Spending by Category</h3>
+          {Object.entries(groupByCategory(activeItems)).map(([catKey, items]) => {
+            const catConfig = CATEGORIES[catKey] || CATEGORIES.other
+            const catTotal = items.reduce((s, i) => s + Number(i.amount), 0)
+            const pct = monthlyTotal > 0 ? (catTotal / monthlyTotal) * 100 : 0
+            return (
+              <div key={catKey} className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="font-medium text-gray-700">{catConfig.label}</span>
+                  <span className="text-gray-600">${catTotal.toFixed(2)}/mo ({pct.toFixed(0)}%)</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-[#F97316] rounded-full" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
-    );
-  };
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-400">Loading subscriptions...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SubscriptionModal
+        isOpen={modalOpen}
+        onClose={() => { setModalOpen(false); setEditingSub(null) }}
+        onSave={handleSave}
+        editData={editingSub}
+      />
+
       {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-gray-200">
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-start justify-between mb-6">
             <div>
@@ -499,11 +509,10 @@ export default function Subscriptions() {
               <p className="text-gray-600 mt-1">Manage and track all your subscriptions</p>
             </div>
             <div className="flex gap-3">
-              <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2 transition-colors">
-                <Filter size={18} />
-                Filter
-              </button>
-              <button className="px-4 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 flex items-center gap-2 transition-colors">
+              <button
+                onClick={openAdd}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 flex items-center gap-2 transition-colors"
+              >
                 <Plus size={18} />
                 Add Manually
               </button>
@@ -513,29 +522,26 @@ export default function Subscriptions() {
           {/* View Tabs & Sort */}
           <div className="flex items-center justify-between">
             <div className="flex gap-2">
-              {['By Category', 'All List', 'Spending'].map((tab) => {
-                const viewKey = tab.toLowerCase().replace(' ', '-');
-                const isActive = activeView === viewKey;
+              {['By Category', 'All List', 'Spending'].map(tab => {
+                const viewKey = tab.toLowerCase().replace(' ', '-')
+                const isActive = activeView === viewKey
                 return (
                   <button
                     key={tab}
                     onClick={() => setActiveView(viewKey)}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      isActive
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'text-gray-600 hover:bg-gray-100'
+                      isActive ? 'bg-orange-100 text-orange-700' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
                     {tab}
                   </button>
-                );
+                )
               })}
             </div>
 
-            {/* Sort Dropdown */}
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              onChange={e => setSortBy(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors appearance-none cursor-pointer bg-white"
             >
               <option value="price-high">Price: High to Low</option>
@@ -554,5 +560,5 @@ export default function Subscriptions() {
         {activeView === 'spending' && renderSpendingView()}
       </div>
     </div>
-  );
+  )
 }

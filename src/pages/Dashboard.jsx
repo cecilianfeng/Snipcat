@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   DollarSign,
   Package,
@@ -8,185 +9,140 @@ import {
   Mail,
   Filter,
   ChevronDown,
-} from 'lucide-react';
+  Plus,
+  Inbox,
+} from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { getSubscriptions, calcMonthlyTotal, getUpcomingRenewals } from '../lib/subscriptions'
 
 const Dashboard = () => {
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('renewal');
-  const [hoveredId, setHoveredId] = useState(null);
+  const { user } = useAuth()
+  const [subscriptions, setSubscriptions] = useState([])
+  const [loadingData, setLoadingData] = useState(true)
+  const [activeFilter, setActiveFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('renewal')
+  const [hoveredId, setHoveredId] = useState(null)
 
-  const subscriptions = [
-    {
-      id: 1,
-      name: 'Claude MAX',
-      provider: 'Anthropic',
-      price: 100,
-      cycle: 'Monthly',
-      renewal: 'Mar 14',
-      status: 'active',
-      color: 'bg-amber-100',
-      textColor: 'text-amber-700',
-      initial: 'C',
-    },
-    {
-      id: 2,
-      name: 'Cursor',
-      provider: 'MAX Plan',
-      price: 200,
-      cycle: 'Monthly',
-      renewal: 'Apr 5',
-      status: 'review',
-      color: 'bg-indigo-100',
-      textColor: 'text-indigo-600',
-      initial: 'C',
-    },
-    {
-      id: 3,
-      name: 'Netflix',
-      provider: 'Premium Plan',
-      price: 22.99,
-      cycle: 'Monthly',
-      renewal: 'Mar 18',
-      status: 'active',
-      color: 'bg-red-100',
-      textColor: 'text-red-600',
-      initial: 'N',
-    },
-    {
-      id: 4,
-      name: 'Spotify',
-      provider: 'Family Plan',
-      price: 16.99,
-      cycle: 'Monthly',
-      renewal: 'Mar 15',
-      status: 'active',
-      color: 'bg-green-100',
-      textColor: 'text-green-600',
-      initial: 'S',
-    },
-    {
-      id: 5,
-      name: 'ChatGPT Plus',
-      provider: 'Individual',
-      price: 20,
-      cycle: 'Monthly',
-      renewal: 'Mar 22',
-      status: 'active',
-      color: 'bg-teal-100',
-      textColor: 'text-teal-600',
-      initial: 'G',
-    },
-    {
-      id: 6,
-      name: 'Notion',
-      provider: 'Plus Plan',
-      price: 10,
-      cycle: 'Monthly',
-      renewal: 'Apr 1',
-      status: 'active',
-      color: 'bg-gray-100',
-      textColor: 'text-gray-700',
-      initial: 'N',
-    },
-    {
-      id: 7,
-      name: 'GitHub Copilot',
-      provider: 'Individual',
-      price: 10,
-      cycle: 'Monthly',
-      renewal: 'Mar 28',
-      status: 'active',
-      color: 'bg-purple-100',
-      textColor: 'text-purple-600',
-      initial: 'G',
-    },
-    {
-      id: 8,
-      name: 'iCloud+',
-      provider: '200GB',
-      price: 2.99,
-      cycle: 'Monthly',
-      renewal: 'Mar 30',
-      status: 'active',
-      color: 'bg-sky-100',
-      textColor: 'text-sky-600',
-      initial: 'i',
-    },
-    {
-      id: 9,
-      name: 'Adobe Creative Cloud',
-      provider: 'All Apps',
-      price: 54.99,
-      cycle: 'Monthly',
-      renewal: '',
-      status: 'cancelled',
-      color: 'bg-red-100',
-      textColor: 'text-red-400',
-      initial: 'A',
-    },
-  ];
+  useEffect(() => {
+    if (!user) return
+    loadSubscriptions()
+  }, [user])
 
-  // Filter subscriptions based on activeFilter
-  const filteredSubscriptions = subscriptions.filter((sub) => {
-    if (activeFilter === 'all') return true;
-    return sub.status === activeFilter;
-  });
-
-  // Sort subscriptions
-  const sortedSubscriptions = [...filteredSubscriptions].sort((a, b) => {
-    if (sortBy === 'renewal') {
-      // Sort by renewal date (cancelled items go to bottom)
-      if (a.status === 'cancelled' && b.status !== 'cancelled') return 1;
-      if (a.status !== 'cancelled' && b.status === 'cancelled') return -1;
-      if (a.status === 'cancelled' && b.status === 'cancelled') return 0;
-
-      const dateA = new Date(a.renewal.replace('Apr', 'Apr').replace('Mar', 'Mar'));
-      const dateB = new Date(b.renewal.replace('Apr', 'Apr').replace('Mar', 'Mar'));
-      return dateA - dateB;
-    } else if (sortBy === 'price') {
-      return b.price - a.price;
-    } else if (sortBy === 'name') {
-      return a.name.localeCompare(b.name);
+  const loadSubscriptions = async () => {
+    try {
+      const data = await getSubscriptions(user.id)
+      setSubscriptions(data)
+    } catch (err) {
+      console.error('Failed to load subscriptions:', err)
+    } finally {
+      setLoadingData(false)
     }
-    return 0;
-  });
+  }
 
-  const getFilterCounts = () => {
-    return {
-      all: subscriptions.length,
-      active: subscriptions.filter((s) => s.status === 'active').length,
-      review: subscriptions.filter((s) => s.status === 'review').length,
-      cancelled: subscriptions.filter((s) => s.status === 'cancelled').length,
-    };
-  };
+  // Calculate stats
+  const activeCount = subscriptions.filter(s => s.status === 'active').length
+  const monthlyTotal = calcMonthlyTotal(subscriptions)
+  const upcoming = getUpcomingRenewals(subscriptions, 7)
+  const cancelledSavings = subscriptions
+    .filter(s => s.status === 'cancelled')
+    .reduce((sum, s) => sum + s.amount, 0)
 
-  const counts = getFilterCounts();
+  // Filter & sort
+  const filtered = subscriptions.filter(sub => {
+    if (activeFilter === 'all') return true
+    return sub.status === activeFilter
+  })
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'renewal') {
+      if (a.status === 'cancelled') return 1
+      if (b.status === 'cancelled') return -1
+      const dateA = a.next_billing_date ? new Date(a.next_billing_date) : new Date('2999-01-01')
+      const dateB = b.next_billing_date ? new Date(b.next_billing_date) : new Date('2999-01-01')
+      return dateA - dateB
+    } else if (sortBy === 'price') {
+      return b.amount - a.amount
+    } else if (sortBy === 'name') {
+      return a.name.localeCompare(b.name)
+    }
+    return 0
+  })
+
+  const getFilterCounts = () => ({
+    all: subscriptions.length,
+    active: subscriptions.filter(s => s.status === 'active').length,
+    paused: subscriptions.filter(s => s.status === 'paused').length,
+    cancelled: subscriptions.filter(s => s.status === 'cancelled').length,
+  })
+  const counts = getFilterCounts()
 
   const getStatusBadge = (status) => {
-    switch (status) {
-      case 'active':
-        return (
-          <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">
-            Active
-          </span>
-        );
-      case 'review':
-        return (
-          <span className="px-3 py-1 bg-orange-100 text-orange-700 text-sm font-medium rounded-full">
-            Review
-          </span>
-        );
-      case 'cancelled':
-        return (
-          <span className="px-3 py-1 bg-gray-100 text-gray-600 text-sm font-medium rounded-full">
-            Cancelled
-          </span>
-        );
-      default:
-        return null;
+    const styles = {
+      active: 'bg-green-100 text-green-700',
+      paused: 'bg-orange-100 text-orange-700',
+      cancelled: 'bg-gray-100 text-gray-600',
     }
-  };
+    return (
+      <span className={`px-3 py-1 ${styles[status] || 'bg-gray-100 text-gray-600'} text-sm font-medium rounded-full capitalize`}>
+        {status}
+      </span>
+    )
+  }
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—'
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  const getInitial = (name) => name ? name.charAt(0).toUpperCase() : '?'
+
+  // ─── EMPTY STATE ───
+  if (!loadingData && subscriptions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-gray-600 mt-1">Your subscription overview at a glance.</p>
+          </div>
+        </header>
+
+        <main className="max-w-2xl mx-auto px-4 py-20 text-center">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-orange-50 flex items-center justify-center">
+            <Inbox size={36} className="text-[#F97316]" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">No subscriptions yet</h2>
+          <p className="text-gray-500 mb-8 max-w-md mx-auto">
+            Start by scanning your inbox to automatically find subscriptions, or add one manually.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button className="px-6 py-3 bg-[#F97316] text-white rounded-xl font-semibold hover:bg-[#EA580C] transition-colors flex items-center gap-2">
+              <Mail size={18} />
+              Scan Inbox
+            </button>
+            <Link
+              to="/subscriptions"
+              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Add Manually
+            </Link>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // ─── LOADING STATE ───
+  if (loadingData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-400">Loading your subscriptions...</div>
+      </div>
+    )
+  }
+
+  // ─── MAIN DASHBOARD ───
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -215,12 +171,11 @@ const Dashboard = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Total Monthly Cost */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 relative">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-gray-600 text-sm font-medium">Total Monthly Cost</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">$127.50</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">${monthlyTotal.toFixed(2)}</p>
               </div>
               <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-blue-600" />
@@ -228,12 +183,11 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Active Subscriptions */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-gray-600 text-sm font-medium">Active Subscriptions</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">12</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{activeCount}</p>
               </div>
               <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
                 <Package className="w-6 h-6 text-purple-600" />
@@ -241,12 +195,11 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Renewing Soon */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-gray-600 text-sm font-medium">Renewing Soon</p>
-                <p className="text-3xl font-bold text-orange-500 mt-2">3</p>
+                <p className="text-3xl font-bold text-orange-500 mt-2">{upcoming.length}</p>
               </div>
               <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
                 <Clock className="w-6 h-6 text-orange-500" />
@@ -254,12 +207,11 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Saved This Month */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-gray-600 text-sm font-medium">Saved This Month</p>
-                <p className="text-3xl font-bold text-green-600 mt-2">$47.00</p>
+                <p className="text-3xl font-bold text-green-600 mt-2">${cancelledSavings.toFixed(2)}</p>
               </div>
               <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
                 <TrendingDown className="w-6 h-6 text-green-600" />
@@ -274,9 +226,9 @@ const Dashboard = () => {
             {[
               { key: 'all', label: 'All', count: counts.all },
               { key: 'active', label: 'Active', count: counts.active },
-              { key: 'review', label: 'Review', count: counts.review },
+              { key: 'paused', label: 'Paused', count: counts.paused },
               { key: 'cancelled', label: 'Cancelled', count: counts.cancelled },
-            ].map((filter) => (
+            ].map(filter => (
               <button
                 key={filter.key}
                 onClick={() => setActiveFilter(filter.key)}
@@ -291,7 +243,6 @@ const Dashboard = () => {
             ))}
           </div>
 
-          {/* Sort Dropdown */}
           <div className="relative">
             <select
               value={sortBy}
@@ -308,8 +259,8 @@ const Dashboard = () => {
 
         {/* Subscription List */}
         <div className="space-y-3">
-          {sortedSubscriptions.length > 0 ? (
-            sortedSubscriptions.map((sub) => (
+          {sorted.length > 0 ? (
+            sorted.map(sub => (
               <div
                 key={sub.id}
                 onMouseEnter={() => setHoveredId(sub.id)}
@@ -318,31 +269,27 @@ const Dashboard = () => {
                   sub.status === 'cancelled' ? 'opacity-50' : ''
                 }`}
               >
-                {/* Left Section */}
                 <div className="flex items-center gap-4 flex-1">
-                  <div
-                    className={`w-12 h-12 rounded-full ${sub.color} ${sub.textColor} flex items-center justify-center font-bold text-lg flex-shrink-0`}
-                  >
-                    {sub.initial}
-                  </div>
+                  {sub.logo_url ? (
+                    <img src={sub.logo_url} alt={sub.name} className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                      {getInitial(sub.name)}
+                    </div>
+                  )}
                   <div>
-                    <p
-                      className={`font-semibold text-gray-900 ${
-                        sub.status === 'cancelled' ? 'line-through text-gray-500' : ''
-                      }`}
-                    >
+                    <p className={`font-semibold text-gray-900 ${sub.status === 'cancelled' ? 'line-through text-gray-500' : ''}`}>
                       {sub.name}
                     </p>
-                    <p className="text-sm text-gray-600">{sub.provider}</p>
+                    <p className="text-sm text-gray-600 capitalize">{sub.category || 'Uncategorized'} · {sub.billing_cycle}</p>
                   </div>
                 </div>
 
-                {/* Right Section */}
                 <div className="flex items-center gap-6">
-                  {sub.status !== 'cancelled' && sub.renewal && (
+                  {sub.status !== 'cancelled' && sub.next_billing_date && (
                     <div className="text-right">
                       <p className="text-sm text-gray-600">Next renewal</p>
-                      <p className="font-semibold text-gray-900">{sub.renewal}</p>
+                      <p className="font-semibold text-gray-900">{formatDate(sub.next_billing_date)}</p>
                     </div>
                   )}
                   {sub.status === 'cancelled' && (
@@ -355,38 +302,23 @@ const Dashboard = () => {
                   <div className="text-right min-w-20">
                     <p className="text-sm text-gray-600">Price</p>
                     <p className="font-semibold text-gray-900">
-                      ${sub.price.toFixed(2)}
+                      ${Number(sub.amount).toFixed(2)}
                     </p>
                   </div>
 
                   <div className="min-w-32">{getStatusBadge(sub.status)}</div>
-
-                  {/* Action Buttons (shown on hover) */}
-                  {hoveredId === sub.id && (
-                    <div className="flex gap-2">
-                      <button className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-lg hover:bg-green-200 transition-colors whitespace-nowrap">
-                        Keep
-                      </button>
-                      <button className="px-3 py-1 bg-orange-100 text-orange-700 text-sm font-medium rounded-lg hover:bg-orange-200 transition-colors whitespace-nowrap">
-                        Review
-                      </button>
-                      <button className="px-3 py-1 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors whitespace-nowrap">
-                        Cancel
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             ))
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-              <p className="text-gray-600 font-medium">No subscriptions found.</p>
+              <p className="text-gray-600 font-medium">No subscriptions match this filter.</p>
             </div>
           )}
         </div>
       </main>
     </div>
-  );
-};
+  )
+}
 
-export default Dashboard;
+export default Dashboard

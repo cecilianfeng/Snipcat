@@ -2,18 +2,24 @@ import { supabase } from './supabaseClient'
 
 // Ensure profile exists (for users who signed up before the profiles table was created)
 export async function ensureProfile(user) {
+  // Use maybeSingle() instead of single() to avoid error when no row found
   const { data } = await supabase
     .from('profiles')
     .select('id')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
+
   if (!data) {
-    await supabase.from('profiles').insert({
+    // Use upsert to handle race conditions and RLS gracefully
+    const { error } = await supabase.from('profiles').upsert({
       id: user.id,
       full_name: user.user_metadata?.full_name || null,
       avatar_url: user.user_metadata?.avatar_url || null,
       email: user.email,
-    })
+    }, { onConflict: 'id' })
+    if (error) {
+      console.warn('ensureProfile insert failed:', error.message)
+    }
   }
 }
 

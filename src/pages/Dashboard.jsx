@@ -26,8 +26,10 @@ const Dashboard = () => {
   const [sortBy, setSortBy] = useState('renewal')
   const [hoveredId, setHoveredId] = useState(null)
   const [scanning, setScanning] = useState(false)
-  const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 })
-  const [scanResult, setScanResult] = useState(null) // { found: number } or { error: string }
+  const [scanProgress, setScanProgress] = useState({ phase: 0, message: '', current: 0, total: 0 })
+  const [scanResult, setScanResult] = useState(null) // { confirmed, needsReview, addedCount } or { error }
+  const [scanMonths, setScanMonths] = useState(6)
+  const [reviewItems, setReviewItems] = useState([]) // items needing user confirmation
 
   useEffect(() => {
     if (!user) return
@@ -48,7 +50,8 @@ const Dashboard = () => {
   const handleScanInbox = async () => {
     setScanning(true)
     setScanResult(null)
-    setScanProgress({ current: 0, total: 0 })
+    setReviewItems([])
+    setScanProgress({ phase: 0, message: 'Starting scan...', current: 0, total: 0 })
     try {
       const token = await getGoogleToken()
       if (!token) {
@@ -56,16 +59,19 @@ const Dashboard = () => {
         setScanning(false)
         return
       }
-      const found = await scanGmailForSubscriptions(token, (current, total) => {
-        setScanProgress({ current, total })
-      })
-      // Save new subscriptions (skip ones that already exist by name)
+      const { confirmed, needsReview } = await scanGmailForSubscriptions(
+        token,
+        (progress) => setScanProgress(progress),
+        { months: scanMonths }
+      )
+      // Save confirmed subscriptions (skip duplicates by name)
       const existingNames = new Set(subscriptions.map(s => s.name.toLowerCase()))
       let addedCount = 0
-      for (const sub of found) {
+      for (const sub of confirmed) {
         if (!existingNames.has(sub.name.toLowerCase())) {
           try {
-            await createSubscription({ ...sub, user_id: user.id })
+            const { _emailCount, _confidence, _domain, ...dbSub } = sub
+            await createSubscription({ ...dbSub, amount: dbSub.amount || 0, user_id: user.id })
             addedCount++
           } catch (err) {
             console.warn('Failed to add:', sub.name, err)
@@ -73,13 +79,31 @@ const Dashboard = () => {
         }
       }
       await loadSubscriptions()
-      setScanResult({ found: addedCount, total: found.length })
+      // Set review items for user confirmation
+      const reviewFiltered = needsReview.filter(s => !existingNames.has(s.name.toLowerCase()))
+      setReviewItems(reviewFiltered)
+      setScanResult({ addedCount, confirmedTotal: confirmed.length, reviewCount: reviewFiltered.length })
     } catch (err) {
       console.error('Scan failed:', err)
       setScanResult({ error: err.message })
     } finally {
       setScanning(false)
     }
+  }
+
+  const handleApproveReview = async (item) => {
+    try {
+      const { _emailCount, _confidence, _domain, ...dbSub } = item
+      await createSubscription({ ...dbSub, amount: dbSub.amount || 0, user_id: user.id })
+      setReviewItems(prev => prev.filter(r => r.name !== item.name))
+      await loadSubscriptions()
+    } catch (err) {
+      console.warn('Failed to add:', item.name, err)
+    }
+  }
+
+  const handleDismissReview = (item) => {
+    setReviewItems(prev => prev.filter(r => r.name !== item.name))
   }
 
   // Calculate stats
@@ -159,14 +183,25 @@ const Dashboard = () => {
             Start by scanning your inbox to automatically find subscriptions, or add one manually.
           </p>
           <div className="flex flex-col items-center gap-3">
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
+              <select
+                value={scanMonths}
+                onChange={(e) => setScanMonths(Number(e.target.value))}
+                disabled={scanning}
+                className="px-3 py-3 border border-gray-300 rounded-xl text-sm font-medium text-gray-700"
+              >
+                <option value={3}>3 months</option>
+                <option value={6}>6 months</option>
+                <option value={12}>12 months</option>
+                <option value={24}>24 months</option>
+              </select>
               <button
                 onClick={handleScanInbox}
                 disabled={scanning}
                 className="px-6 py-3 bg-[#F97316] text-white rounded-xl font-semibold hover:bg-[#EA580C] transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 {scanning ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />}
-                {scanning ? `Scanning... (${scanProgress.current}/${scanProgress.total})` : 'Scan Inbox'}
+                {scanning ? 'Scanning...' : 'Scan Inbox'}
               </button>
               <Link
                 to="/subscriptions?add=1"
@@ -176,13 +211,20 @@ const Dashboard = () => {
                 Add Manually
               </Link>
             </div>
+            {scanning && (
+              <div className="text-sm text-gray-600 text-center">
+                <p className="font-medium">Phase {scanProgress.phase}/4</p>
+                <p>{scanProgress.message}</p>
+              </div>
+            )}
             {scanResult?.error && (
               <p className="text-sm text-red-500 max-w-md">{scanResult.error}</p>
             )}
             {scanResult && !scanResult.error && (
               <p className="text-sm text-green-600 flex items-center gap-1">
                 <CheckCircle size={16} />
-                Found {scanResult.total} subscription{scanResult.total !== 1 ? 's' : ''}, added {scanResult.found} new.
+                Added {scanResult.addedCount} subscription{scanResult.addedCount !== 1 ? 's' : ''}.
+                {scanResult.reviewCount > 0 && ` ${scanResult.reviewCount} need your review.`}
               </p>
             )}
           </div>
@@ -224,21 +266,55 @@ const Dashboard = () => {
               <Plus className="w-4 h-4" />
               Add Manually
             </Link>
+            <select
+              value={scanMonths}
+              onChange={(e) => setScanMonths(Number(e.target.value))}
+              disabled={scanning}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700"
+            >
+              <option value={3}>3 mo</option>
+              <option value={6}>6 mo</option>
+              <option value={12}>12 mo</option>
+              <option value={24}>24 mo</option>
+            </select>
             <button
               onClick={handleScanInbox}
               disabled={scanning}
               className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 font-medium disabled:opacity-50"
             >
               {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-              {scanning ? `Scanning... (${scanProgress.current}/${scanProgress.total})` : 'Scan Inbox'}
+              {scanning ? 'Scanning...' : 'Scan Inbox'}
             </button>
           </div>
         </div>
       </header>
 
+      {/* Scanning Progress Banner */}
+      {scanning && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="rounded-xl p-4 bg-blue-50 border border-blue-200">
+            <div className="flex items-center gap-3">
+              <Loader2 size={18} className="animate-spin text-blue-600" />
+              <div>
+                <p className="text-sm font-medium text-blue-700">Phase {scanProgress.phase}/4</p>
+                <p className="text-sm text-blue-600">{scanProgress.message}</p>
+              </div>
+            </div>
+            {scanProgress.total > 0 && (
+              <div className="mt-2 bg-blue-100 rounded-full h-2">
+                <div
+                  className="bg-blue-500 rounded-full h-2 transition-all duration-300"
+                  style={{ width: `${Math.min(100, (scanProgress.current / scanProgress.total) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Scan Result Banner */}
-      {scanResult && (
-        <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4`}>
+      {scanResult && !scanning && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
           <div className={`rounded-xl p-4 flex items-center justify-between ${
             scanResult.error ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'
           }`}>
@@ -250,11 +326,57 @@ const Dashboard = () => {
               ) : (
                 <>
                   <CheckCircle size={16} />
-                  Scan complete! Found {scanResult.total} subscription{scanResult.total !== 1 ? 's' : ''} in your inbox, added {scanResult.found} new.
+                  Scan complete! Added {scanResult.addedCount} confirmed subscription{scanResult.addedCount !== 1 ? 's' : ''}.
+                  {scanResult.reviewCount > 0 && ` ${scanResult.reviewCount} item${scanResult.reviewCount !== 1 ? 's' : ''} need your review below.`}
                 </>
               )}
             </p>
             <button onClick={() => setScanResult(null)} className="text-sm text-gray-500 hover:text-gray-700">Dismiss</button>
+          </div>
+        </div>
+      )}
+
+      {/* Review Items Section */}
+      {reviewItems.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-5">
+            <h3 className="font-semibold text-orange-800 mb-3">Possible subscriptions — please confirm</h3>
+            <div className="space-y-2">
+              {reviewItems.map((item, idx) => (
+                <div key={idx} className="bg-white rounded-lg p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {item.logo_url ? (
+                      <img src={item.logo_url} alt={item.name} className="w-8 h-8 rounded-full" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-sm">
+                        {item.name?.charAt(0) || '?'}
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium text-gray-900">{item.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {item._emailCount} email{item._emailCount !== 1 ? 's' : ''} found · {item._domain}
+                        {item.amount ? ` · $${item.amount.toFixed(2)}/${item.billing_cycle}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApproveReview(item)}
+                      className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200"
+                    >
+                      Add
+                    </button>
+                    <button
+                      onClick={() => handleDismissReview(item)}
+                      className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -394,7 +516,7 @@ const Dashboard = () => {
                   <div className="text-right min-w-20">
                     <p className="text-sm text-gray-600">Price</p>
                     <p className="font-semibold text-gray-900">
-                      ${Number(sub.amount).toFixed(2)}
+                      {Number(sub.amount) > 0 ? `$${Number(sub.amount).toFixed(2)}` : '—'}
                     </p>
                   </div>
 

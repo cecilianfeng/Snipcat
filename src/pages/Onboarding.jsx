@@ -86,14 +86,17 @@ export default function Onboarding() {
           setCurrentStep(1)
           return
         }
-        const found = await scanGmailForSubscriptions(token, (current, total) => {
-          setScanProgress({ current, total })
-        })
-        // Save found subscriptions
+        const { confirmed, needsReview } = await scanGmailForSubscriptions(
+          token,
+          (progress) => setScanProgress({ current: progress.current, total: progress.total }),
+          { months: 6 }
+        )
+        // Save confirmed subscriptions
         let added = 0
-        for (const sub of found) {
+        for (const sub of [...confirmed, ...needsReview]) {
           try {
-            await createSubscription({ ...sub, user_id: user.id })
+            const { _emailCount, _confidence, _domain, ...dbSub } = sub
+            await createSubscription({ ...dbSub, amount: dbSub.amount || 0, user_id: user.id })
             added++
           } catch (err) {
             console.warn('Failed to add:', sub.name, err)

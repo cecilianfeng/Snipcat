@@ -389,7 +389,7 @@ export default function Subscriptions() {
                           <p className="font-medium">{formatDate(item.next_billing_date)}</p>
                         </div>
                         <div className="text-right min-w-max">
-                          <p className="text-lg font-semibold text-gray-900">${Number(item.amount).toFixed(2)}</p>
+                          <p className="text-lg font-semibold text-gray-900">{Number(item.amount) > 0 ? `$${Number(item.amount).toFixed(2)}` : '—'}</p>
                           <p className="text-xs text-gray-500">{item.billing_cycle}</p>
                         </div>
                         <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
@@ -473,7 +473,7 @@ export default function Subscriptions() {
               <p className="text-sm text-gray-500 capitalize">{CATEGORIES[item.category]?.label || 'Other'}</p>
             </div>
             <div className="text-sm text-gray-600">{formatDate(item.next_billing_date)}</div>
-            <div className="font-semibold text-gray-900">${Number(item.amount).toFixed(2)}</div>
+            <div className="font-semibold text-gray-900">{Number(item.amount) > 0 ? `$${Number(item.amount).toFixed(2)}` : '—'}</div>
             <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
               {item.status}
             </div>

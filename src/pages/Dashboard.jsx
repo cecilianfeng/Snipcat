@@ -228,6 +228,51 @@ const Dashboard = () => {
               </p>
             )}
           </div>
+
+          {/* Review Items — also shown in empty state */}
+          {reviewItems.length > 0 && (
+            <div className="max-w-2xl mx-auto mt-8 text-left">
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-5">
+                <h3 className="font-semibold text-orange-800 mb-3">Possible subscriptions — please confirm</h3>
+                <div className="space-y-2">
+                  {reviewItems.map((item, idx) => (
+                    <div key={idx} className="bg-white rounded-lg p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {item.logo_url ? (
+                          <img src={item.logo_url} alt={item.name} className="w-8 h-8 rounded-full" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-sm">
+                            {item.name?.charAt(0) || '?'}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-900">{item.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {item._emailCount} email{item._emailCount !== 1 ? 's' : ''} found · {item._domain}
+                            {item.amount ? ` · $${item.amount.toFixed(2)}/${item.billing_cycle}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApproveReview(item)}
+                          className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200"
+                        >
+                          Add
+                        </button>
+                        <button
+                          onClick={() => handleDismissReview(item)}
+                          className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200"
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     )

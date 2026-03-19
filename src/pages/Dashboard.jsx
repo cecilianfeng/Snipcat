@@ -312,7 +312,7 @@ const Dashboard = () => {
                 <option value={6}>6 months</option>
                 <option value={12}>12 months</option>
                 <option value={24}>24 months</option>
-                <option value={36}>3 years</option>
+                <option value={36}>36 months</option>
               </select>
               <button
                 onClick={handleScanInbox}
@@ -499,7 +499,7 @@ const Dashboard = () => {
               <option value={6}>6 mo</option>
               <option value={12}>12 mo</option>
               <option value={24}>24 mo</option>
-              <option value={36}>3 yr</option>
+              <option value={36}>36 mo</option>
             </select>
             <button
               onClick={handleScanInbox}

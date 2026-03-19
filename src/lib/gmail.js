@@ -1427,7 +1427,7 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
     '-category:social',
   ].join(' ')
 
-  const messages = await searchAllMessages(token, query, 1000)
+  const messages = await searchAllMessages(token, query, 2000)
 
   if (messages.length === 0) {
     return { confirmed: [], needsReview: [] }

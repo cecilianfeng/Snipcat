@@ -23,7 +23,7 @@
  * Excluded: utilities, insurance, gym, physical storage, retail.
  */
 
-import { runAIAnalysis } from './ai-analysis.js'
+import { analyzeWithAI } from './ai-analysis.js'
 
 const GMAIL_API = 'https://www.googleapis.com/gmail/v1/users/me'
 
@@ -1791,23 +1791,27 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
   }
 
   // ════════════════════════════════════════════════
-  // PHASE 4: Extract details from full email body + PDF
+  // PHASE 4: Fetch email bodies + AI analysis
   // ════════════════════════════════════════════════
-  if (onProgress) onProgress({ phase: 4, message: 'Extracting prices...', current: 0, total: passedDomains.length })
+  // For each candidate domain:
+  // 1. Fetch the most recent email body
+  // 2. Build regex-based fallback data (name, price, cycle)
+  // 3. Send to Claude AI for final determination
+  //
+  // AI is the PRIMARY judge — it decides if something is a subscription,
+  // extracts the correct name/amount/cycle, and filters out false positives.
+  if (onProgress) onProgress({ phase: 4, message: 'Reading emails...', current: 0, total: passedDomains.length })
 
-  const confirmed = []
-  const needsReview = []
-  const reviewEmailData = new Map() // reviewIndex → { subject, bodyText, from, domain } for AI
+  const aiCandidates = [] // will be sent to AI
 
   for (let i = 0; i < passedDomains.length; i++) {
     const { domain, emails, frequency, isKnown, _unknownWithBilling } = passedDomains[i]
 
-    // Get the most recent email's full content for price extraction
     const newestEmail = emails.sort((a, b) => b.date - a.date)[0]
     const fullMsg = await getFullMessage(token, newestEmail.id)
 
-    let priceResult = null // { amount, currency }
     let bodyText = ''
+    let priceResult = null
     let cycle = null
     let nextDate = null
     const lastEmailDate = newestEmail.date.toISOString()
@@ -1816,10 +1820,10 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
       bodyText = decodeBody(fullMsg.payload)
       const fullText = `${newestEmail.subject} ${bodyText}`
 
-      // Extract price
+      // Regex fallback: extract price
       priceResult = extractAmountAndCurrency(fullText)
 
-      // If no price found in body, try PDF attachment
+      // Try PDF if no price in body
       if (!priceResult) {
         const pdfs = findPdfAttachments(fullMsg)
         for (const pdf of pdfs) {
@@ -1829,162 +1833,108 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
               const pdfText = await extractPdfText(attachData)
               if (pdfText) {
                 priceResult = extractAmountAndCurrency(pdfText)
-                // Also use PDF text for cycle detection
-                if (priceResult) {
-                  bodyText = bodyText + ' ' + pdfText
-                  break
-                }
+                if (priceResult) { bodyText = bodyText + ' ' + pdfText; break }
               }
             }
-          } catch (err) {
-            console.warn('PDF extraction failed for', pdf.filename, err)
-          }
+          } catch (err) { /* skip */ }
         }
       }
 
-      // If still no price, try second-newest email
+      // Try second email if still no price
       if (!priceResult && emails.length >= 2) {
         const secondEmail = emails.sort((a, b) => b.date - a.date)[1]
         const secondMsg = await getFullMessage(token, secondEmail.id)
         if (secondMsg) {
           const secondBody = decodeBody(secondMsg.payload)
           priceResult = extractAmountAndCurrency(`${secondEmail.subject} ${secondBody}`)
-
-          // Try PDF in second email too
-          if (!priceResult) {
-            const pdfs2 = findPdfAttachments(secondMsg)
-            for (const pdf of pdfs2) {
-              try {
-                const attachData = await getAttachment(token, secondEmail.id, pdf.attachmentId)
-                if (attachData) {
-                  const pdfText = await extractPdfText(attachData)
-                  if (pdfText) {
-                    priceResult = extractAmountAndCurrency(pdfText)
-                    if (priceResult) {
-                      bodyText = bodyText + ' ' + pdfText
-                      break
-                    }
-                  }
-                }
-              } catch (err) { /* skip */ }
-            }
-          }
+          if (!priceResult) bodyText = bodyText + ' ' + secondBody
         }
       }
 
-      // Detect billing cycle — prioritize: frequency analysis > email body keywords > date range
       const combinedText = `${newestEmail.subject} ${bodyText}`
-      const bodyDetectedCycle = detectBillingCycle(combinedText)
-      // Prefer frequency analysis cycle (based on actual email intervals) over body keywords
-      cycle = frequency.cycle || bodyDetectedCycle
-      // cycle may still be null — that's OK, user will choose
-
-      // Extract next billing date from email content first
+      cycle = frequency.cycle || detectBillingCycle(combinedText)
       nextDate = extractNextBillingDate(combinedText)
     }
 
-    // ── Handle Apple App Store receipts: extract individual apps from 5 most recent emails ──
+    // For Apple App Store: fetch multiple emails to capture all apps
     const isApple = domain === 'apple.com' || domain.endsWith('.apple.com')
-    if (isApple) {
-      // Get up to 5 most recent emails to capture multiple different app subscriptions
+    if (isApple && emails.length > 1) {
+      // Send up to 5 Apple emails to AI — each may be a different app
       const recentEmails = emails.sort((a, b) => b.date - a.date).slice(0, 5)
-      const allAppDetails = {}
-
       for (const appleEmail of recentEmails) {
         const appleMsg = await getFullMessage(token, appleEmail.id)
         if (!appleMsg) continue
+        const appleBody = decodeBody(appleMsg.payload)
+        if (!appleBody) continue
 
-        const appleBodyText = decodeBody(appleMsg.payload)
-        if (!appleBodyText) continue
-
-        const appDetails = extractAppleAppDetails(appleBodyText)
-        for (const app of appDetails) {
-          // Use app name as key to avoid duplicates, but store with most recent data
-          allAppDetails[app.appName] = {
-            appName: app.appName,
-            amount: app.amount || null,
-            currency: app.currency || 'USD',
-            cycle: app.cycle || null,
-            renewDate: app.renewDate || null,
-            lastSeen: appleEmail.date.toISOString(),
-          }
+        const lookupDomain = 'apple.com'
+        const regexSub = {
+          name: 'App Store',
+          category: 'entertainment',
+          amount: priceResult?.amount || null,
+          currency: priceResult?.currency || 'USD',
+          billing_cycle: cycle,
+          status: 'active',
+          next_billing_date: nextDate,
+          last_email_date: appleEmail.date.toISOString(),
+          logo_url: getLogoUrl('apple.com'),
+          notes: 'Found via inbox scan (App Store)',
+          _emailCount: emails.length,
+          _confidence: frequency.confidence,
+          _domain: 'apple.com',
+          _singleEmail: false,
+          _isPending: false,
         }
-      }
 
-      if (Object.keys(allAppDetails).length > 0) {
-        // Create a subscription item for each unique app
-        for (const appData of Object.values(allAppDetails)) {
-          const appSub = {
-            name: `${appData.appName} (App Store)`,
-            category: 'entertainment',
-            amount: appData.amount || null,
-            currency: appData.currency || 'USD',
-            billing_cycle: appData.cycle || cycle || null,
-            status: 'active',
-            next_billing_date: appData.renewDate || null,
-            last_email_date: appData.lastSeen,
-            logo_url: getLogoUrl('apple.com'),
-            notes: 'Found via inbox scan (App Store)',
-            _emailCount: emails.length,
-            _confidence: frequency.confidence,
-            _domain: 'apple.com',
-          }
-          const appReviewIdx = needsReview.length
-          needsReview.push(appSub) // App Store items always go to review
-          reviewEmailData.set(appReviewIdx, {
-            subject: newestEmail.subject || '',
-            bodyText: bodyText || '',
-            from: newestEmail.from || '',
-            domain: 'apple.com',
-          })
-        }
-        // Skip the normal flow for this Apple domain
-        if (onProgress) onProgress({
-          phase: 4,
-          message: `Extracted ${Object.keys(allAppDetails).length} App Store subscriptions (${i + 1}/${passedDomains.length})`,
-          current: i + 1,
-          total: passedDomains.length,
+        aiCandidates.push({
+          domain,
+          emails,
+          frequency,
+          isKnown: true,
+          emailData: {
+            subject: appleEmail.subject || '',
+            bodyText: appleBody,
+            from: appleEmail.from || '',
+            domain: lookupDomain,
+          },
+          regexSubscription: regexSub,
         })
-        continue
       }
+
+      if (onProgress) onProgress({
+        phase: 4,
+        message: `Reading Apple emails (${i + 1}/${passedDomains.length})`,
+        current: i + 1,
+        total: passedDomains.length,
+      })
+      continue // Apple handled above, skip normal flow
     }
 
-    // ── Determine service name, category, logo ──
-    let knownInfo = null
-    let serviceName = null
-
-    // Get base domain (strip platform:sender prefix like "substack.com:lenny")
+    // Build regex fallback subscription object
     const lookupDomain = domain.includes(':') && !domain.startsWith('stripe:')
       ? domain.split(':')[0]
       : domain
 
+    let knownInfo = null
+    let serviceName = null
+
     if (domain.startsWith('stripe:')) {
-      // Intermediary-resolved service
       const resolvedName = newestEmail.resolvedName
       knownInfo = findKnownServiceByName(resolvedName)
-      // Try to extract more specific product name from body (e.g., Figma plugin)
       const lineItem = extractStripeLineItem(bodyText)
       if (lineItem && lineItem.length > 2 && (!knownInfo || !lineItem.toLowerCase().includes(knownInfo.name.toLowerCase()))) {
-        // Show as "html.to.design (via Figma)" if we know the parent service
         const parentName = knownInfo?.name || resolvedName
         serviceName = parentName ? `${lineItem} (via ${parentName})` : lineItem
       } else {
         serviceName = knownInfo?.name || resolvedName || domain.replace('stripe:', '')
       }
     } else if (PLATFORM_DOMAINS[lookupDomain]) {
-      // Platform domain — extract specific creator/product name
       const platformInfo = PLATFORM_DOMAINS[lookupDomain]
       knownInfo = matchKnownService(lookupDomain, newestEmail.subject) || {
-        name: platformInfo.platform,
-        category: platformInfo.category,
-        logo: platformInfo.logo,
+        name: platformInfo.platform, category: platformInfo.category, logo: platformInfo.logo,
       }
       const subName = extractPlatformSubName(lookupDomain, newestEmail.from, newestEmail.subject, bodyText)
-      if (subName) {
-        serviceName = `${subName} (via ${platformInfo.platform})`
-      } else {
-        serviceName = platformInfo.platform
-      }
+      serviceName = subName ? `${subName} (via ${platformInfo.platform})` : platformInfo.platform
     } else {
       knownInfo = matchKnownService(lookupDomain, newestEmail.subject)
       serviceName = knownInfo?.name || extractServiceName(newestEmail.from) || lookupDomain
@@ -1992,96 +1942,67 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
 
     const category = knownInfo?.category || 'other'
     const logoDomain = knownInfo?.logo || (domain.startsWith('stripe:') ? (knownInfo?.matchedDomain || domain.replace('stripe:', '')) : lookupDomain)
+    if (!nextDate && cycle) nextDate = estimateNextBillingDate(lastEmailDate, cycle)
 
-    // Estimate next billing date if not extracted from email
-    if (!nextDate && cycle) {
-      nextDate = estimateNextBillingDate(lastEmailDate, cycle)
-    }
-
-    // ── Detect "upcoming/pending" subscriptions ──
-    // Emails that say "subscription starts on [date]" or "paid subscription start date"
-    // but have no actual charge yet
-    let isPending = false
-    if (bodyText) {
-      const pendingPatterns = [
-        /paid\s+subscription\s+start\s*(?:date)?[:\s]+/i,
-        /subscription\s+(?:starts?|begins?)\s+(?:on\s+)?/i,
-        /your\s+(?:new\s+)?plan\s+(?:starts?|begins?)\s+/i,
-      ]
-      if (pendingPatterns.some(p => p.test(bodyText)) && !priceResult) {
-        isPending = true
-      }
-    }
-
-    // ── Single-email flag for user confirmation ──
     const isSingleEmail = emails.length === 1
-    let noteText = 'Found via inbox scan'
-    if (isSingleEmail && !frequency.isRecurring) {
-      noteText = 'Found via inbox scan (single email — please confirm if still active)'
-    }
-    if (isPending) {
-      noteText = 'Upcoming subscription detected (no charge yet — please confirm and enter amount)'
-    }
-
-    const subscription = {
+    const regexSubscription = {
       name: serviceName,
       category,
       amount: priceResult?.amount || null,
       currency: priceResult?.currency || 'USD',
-      billing_cycle: cycle, // null = unknown, user will choose
-      status: isPending ? 'pending' : 'active',
+      billing_cycle: cycle,
+      status: 'active',
       next_billing_date: nextDate,
       last_email_date: lastEmailDate,
       logo_url: getLogoUrl(logoDomain),
-      notes: noteText,
+      notes: 'Found via inbox scan',
       _emailCount: emails.length,
       _confidence: frequency.confidence,
       _domain: lookupDomain.startsWith('stripe:') ? lookupDomain.replace('stripe:', '') : lookupDomain,
       _singleEmail: isSingleEmail && !frequency.isRecurring,
-      _isPending: isPending,
+      _isPending: false,
     }
 
-    if (isKnown && frequency.confidence !== 'low' && !_unknownWithBilling) {
-      confirmed.push(subscription)
-    } else {
-      // Low confidence, unknown brands with billing evidence, single-email, or pending
-      // all go to needsReview for user confirmation
-      const reviewIdx = needsReview.length
-      needsReview.push(subscription)
-      // Save email data for AI analysis in Phase 4.5
-      reviewEmailData.set(reviewIdx, {
+    aiCandidates.push({
+      domain,
+      emails,
+      frequency,
+      isKnown,
+      emailData: {
         subject: newestEmail.subject || '',
         bodyText: bodyText || '',
         from: newestEmail.from || '',
         domain: lookupDomain || domain,
-      })
-    }
+      },
+      regexSubscription,
+    })
 
     if (onProgress) onProgress({
       phase: 4,
-      message: `Extracted details for ${serviceName} (${i + 1}/${passedDomains.length})`,
+      message: `Read ${i + 1} of ${passedDomains.length} emails`,
       current: i + 1,
       total: passedDomains.length,
     })
   }
 
-  // ════════════════════════════════════════════════
-  // PHASE 4.5: AI verification & filtering (optional)
-  // ════════════════════════════════════════════════
-  // Send ALL needsReview items to Claude AI to:
-  // 1. Filter out non-subscriptions (retail, camps, clothing, etc.)
-  // 2. Extract missing amounts, currencies, billing cycles
-  // 3. Detect cancelled status from email content
+  // ── Send all candidates to AI for analysis ──
+  let confirmed = []
+  let needsReview = []
+
   try {
-    if (needsReview.length > 0 && reviewEmailData.size > 0) {
-      const filteredReview = await runAIAnalysis(needsReview, reviewEmailData, onProgress)
-      // Replace needsReview with AI-filtered results
-      needsReview.length = 0
-      needsReview.push(...filteredReview)
-    }
+    const aiResults = await analyzeWithAI(aiCandidates, onProgress)
+    confirmed = aiResults.confirmed
+    needsReview = aiResults.needsReview
   } catch (aiError) {
-    // AI phase is optional — don't let it break the main flow
-    console.warn('Phase 4.5 AI analysis error (continuing without AI):', aiError)
+    // AI failed — fall back to regex-only results
+    console.warn('AI analysis failed, using regex fallback:', aiError)
+    for (const candidate of aiCandidates) {
+      if (candidate.isKnown && candidate.frequency.confidence !== 'low') {
+        confirmed.push(candidate.regexSubscription)
+      } else {
+        needsReview.push(candidate.regexSubscription)
+      }
+    }
   }
 
   return { confirmed, needsReview }

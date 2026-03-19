@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = "claude-haiku-4-5-20251001";
-const MAX_BODY_CHARS = 2000; // Truncate body to save tokens
+const MAX_BODY_CHARS = 3000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,52 +10,57 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
 };
 
-const SYSTEM_PROMPT = `You are an expert email analyst. Analyze the email and determine if it's a PAID digital subscription.
+const SYSTEM_PROMPT = `You are an expert at analyzing emails to identify PAID digital/software subscriptions.
 
-YES — digital subscriptions (return isSubscription: true):
-• SaaS (Figma, Notion, Slack, etc.)
-• AI tools (ChatGPT Plus, Claude Pro, Midjourney, Cursor, etc.)
-• Streaming (Netflix, Spotify, Disney+, YouTube Premium, etc.)
-• Cloud storage (Dropbox, Google One, iCloud+, etc.)
-• App subscriptions (via App Store, Google Play)
-• Design tools (Mobbin, Pitch, Canva Pro, etc.)
-• Developer tools, hosting, domains
-• Paid newsletters, paid community memberships
-• Any recurring digital service with a fee
+Your job: Read the email and extract subscription details. Return a JSON object.
 
-NO — not subscriptions (return isSubscription: false):
-• One-time purchases, shopping orders, retail receipts
-• Clothing, fashion brands (GANNI, Zara, etc.)
-• Physical goods, outdoor gear, sports equipment
-• Airline tickets, travel, hotels
-• Restaurants, food delivery
-• Camps, courses with fixed dates (not recurring)
-• Utility bills (electricity, water, gas)
-• Free newsletters with no payment
-• Marketing emails, promotions with no billing
-• Government services, bank statements
+WHAT COUNTS AS A SUBSCRIPTION (isSubscription: true):
+- SaaS tools (Figma, Notion, Slack, Jira, etc.)
+- AI tools (ChatGPT Plus, Claude Pro, Midjourney, Cursor, etc.)
+- Streaming (Netflix, Spotify, YouTube Premium, Disney+, etc.)
+- Cloud storage (Dropbox, Google One, iCloud+)
+- App Store / Google Play app subscriptions (extract the SPECIFIC APP NAME, not just "App Store")
+- Design/dev tools (Mobbin, Pitch, Canva Pro, GitHub Pro, etc.)
+- Paid newsletters, paid creator memberships (Substack, Patreon)
+- Domain registrations, hosting, VPN
+- Any recurring digital service with a fee
 
-Return ONLY a JSON object (no markdown, no backticks):
+WHAT IS NOT A SUBSCRIPTION (isSubscription: false):
+- Physical product purchases (clothing, gear, equipment, food)
+- Retail stores (GANNI, Zara, Arc'teryx, etc.)
+- Airlines, hotels, travel bookings
+- Summer camps, one-time courses
+- Utility bills (electricity, water, internet ISP)
+- Free newsletters (no payment involved)
+- Marketing/promotional emails
+- Government, bank statements
+- One-time donations
+
+CRITICAL RULES:
+1. For Apple App Store emails: extract the SPECIFIC app name (e.g., "全民K歌", "WPS Office"), NOT "App Store"
+2. For Stripe receipts: identify the actual service being paid for
+3. For platform emails (Substack, Patreon): extract the creator/newsletter name
+4. Extract the exact amount and currency from the email (C$ = CAD, $ = USD unless context says otherwise, ¥ = CNY, € = EUR)
+5. If the email mentions cancellation, set status to "cancelled"
+6. If no payment/charge is mentioned, look for subscription confirmation or renewal notices
+
+Return ONLY valid JSON (no markdown, no backticks):
 {
-  "isSubscription": boolean,
-  "confidence": "high" | "medium" | "low",
-  "serviceName": "string or null",
-  "serviceType": "saas" | "streaming" | "newsletter" | "gaming" | "storage" | "ai-tools" | "other" | null,
+  "isSubscription": true/false,
+  "confidence": "high"/"medium"/"low",
+  "serviceName": "exact service name" or null,
+  "serviceType": "saas"/"streaming"/"newsletter"/"gaming"/"storage"/"ai-tools"/"other" or null,
   "amount": number or null,
-  "currency": "USD"/"CAD"/"CNY"/"EUR"/etc or null,
-  "billingCycle": "monthly" | "quarterly" | "yearly" | null,
+  "currency": "USD"/"CAD"/"CNY"/"EUR" etc or null,
+  "billingCycle": "monthly"/"quarterly"/"yearly" or null,
   "nextBillingDate": "YYYY-MM-DD" or null,
-  "status": "active" | "cancelled" | "pending" | null,
-  "reason": "1 sentence why"
-}
-
-Be strict: if the email is about a physical product, shopping, or non-digital service, always return isSubscription: false.
-Extract amounts carefully — look for total, charge, price. Distinguish CAD/USD by $ vs C$ context.`;
+  "status": "active"/"cancelled"/"pending" or null,
+  "reason": "1 sentence explanation"
+}`;
 
 async function analyzeOneEmail(email: { subject: string; bodyText: string; from: string; domain: string }) {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not set");
 
-  // Truncate body to save tokens
   const truncatedBody = email.bodyText.length > MAX_BODY_CHARS
     ? email.bodyText.slice(0, MAX_BODY_CHARS) + "\n...[truncated]"
     : email.bodyText;
@@ -89,8 +94,6 @@ ${truncatedBody}`;
 
   const data = await response.json();
   const text = data.content[0]?.text || "";
-
-  // Parse JSON — handle possible markdown wrapping
   const cleaned = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
   return JSON.parse(cleaned);
 }
@@ -115,7 +118,7 @@ serve(async (req: Request) => {
       });
     }
 
-    // Process ALL emails in parallel (up to 10 at a time)
+    // Process up to 10 emails in parallel
     const batch = emails.slice(0, 10);
     const results = await Promise.all(
       batch.map(async (email: any) => {

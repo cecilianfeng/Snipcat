@@ -1,17 +1,19 @@
 /**
- * AI Email Analysis — calls Supabase Edge Function → Claude API
- * Used in Phase 4.5 of Gmail scanner to verify subscriptions and extract missing data
+ * AI Email Analysis — calls Supabase Edge Function → Claude Haiku API
+ * Used in Phase 4 of Gmail scanner as the PRIMARY extraction method.
+ * AI reads the email and determines: is it a subscription? what's the name/amount/cycle?
  */
 
 const EDGE_FUNCTION_URL = 'https://zxhgviraiiytpdjbuhpy.supabase.co/functions/v1/analyze-email'
 const SUPABASE_ANON_KEY = 'sb_publishable_c3MRfQVEtQUt6SdQFYq5Kw_kURhd3S8'
+const BATCH_SIZE = 10
 
 /**
  * Send a batch of emails to the Edge Function for AI analysis.
  * @param {Array<{subject, bodyText, from, domain}>} emails — max 10 per call
  * @returns {Promise<Array>} analysis results in same order as input
  */
-export async function callAnalyzeEmail(emails) {
+async function callAnalyzeEmail(emails) {
   const response = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
     headers: {
@@ -33,105 +35,124 @@ export async function callAnalyzeEmail(emails) {
 }
 
 /**
- * Run AI analysis on all needsReview items.
- * - Filters out non-subscriptions (Endeavor Design, GANNI, etc.)
- * - Enhances real subscriptions with extracted amount/cycle/status
+ * Run AI analysis on a list of candidate items.
+ * This is the MAIN extraction method — replaces regex-based extraction.
  *
- * @param {Array} needsReview — items from Phase 4
- * @param {Map} emailBodyMap — Map<itemIndex, {subject, bodyText, from, domain}>
+ * For each candidate:
+ * - Sends email content to Claude AI
+ * - AI determines if it's a subscription
+ * - AI extracts name, amount, currency, cycle, status
+ * - Non-subscriptions are filtered out
+ *
+ * @param {Array<{domain, emails, frequency, isKnown, emailData}>} candidates
+ *   Each candidate has emailData: { subject, bodyText, from, domain }
  * @param {Function} onProgress — progress callback
- * @returns {Promise<Array>} filtered & enhanced needsReview items
+ * @returns {Promise<{confirmed: Array, needsReview: Array}>}
  */
-export async function runAIAnalysis(needsReview, emailBodyMap, onProgress) {
-  if (!needsReview || needsReview.length === 0) return needsReview
+export async function analyzeWithAI(candidates, onProgress) {
+  const confirmed = []
+  const needsReview = []
 
-  // Build the list of items to analyze with their email data
-  const toAnalyze = [] // { index, email }
-  for (let i = 0; i < needsReview.length; i++) {
-    const emailData = emailBodyMap.get(i)
-    if (emailData) {
-      toAnalyze.push({ index: i, email: emailData })
-    }
+  if (!candidates || candidates.length === 0) {
+    return { confirmed, needsReview }
   }
 
-  if (toAnalyze.length === 0) return needsReview
+  // Prepare all email data for AI
+  const emailsToAnalyze = candidates.map(c => c.emailData)
 
   if (onProgress) onProgress({
-    phase: '4.5',
-    message: `AI analyzing ${toAnalyze.length} items...`,
+    phase: 4,
+    message: `AI analyzing ${emailsToAnalyze.length} candidates...`,
     current: 0,
-    total: toAnalyze.length,
+    total: emailsToAnalyze.length,
   })
 
-  // Send in batches of 10 (Edge Function limit)
-  const BATCH_SIZE = 10
-  const allResults = new Map() // index → AI result
-
-  for (let b = 0; b < toAnalyze.length; b += BATCH_SIZE) {
-    const batch = toAnalyze.slice(b, b + BATCH_SIZE)
+  // Send in batches of BATCH_SIZE, process batches in parallel where safe
+  const allResults = []
+  for (let b = 0; b < emailsToAnalyze.length; b += BATCH_SIZE) {
+    const batch = emailsToAnalyze.slice(b, b + BATCH_SIZE)
     try {
-      const results = await callAnalyzeEmail(batch.map(x => x.email))
-      for (let j = 0; j < results.length; j++) {
-        allResults.set(batch[j].index, results[j])
-      }
+      const results = await callAnalyzeEmail(batch)
+      allResults.push(...results)
     } catch (err) {
-      console.warn(`AI batch ${b / BATCH_SIZE + 1} failed:`, err)
-      // Continue with next batch — don't fail everything
+      console.warn(`AI batch ${Math.floor(b / BATCH_SIZE) + 1} failed:`, err)
+      // Fill with fallback for this batch
+      for (let j = 0; j < batch.length; j++) {
+        allResults.push(null) // null = AI failed, use regex fallback
+      }
     }
 
     if (onProgress) onProgress({
-      phase: '4.5',
-      message: `AI analyzed ${Math.min(b + BATCH_SIZE, toAnalyze.length)} of ${toAnalyze.length}`,
-      current: Math.min(b + BATCH_SIZE, toAnalyze.length),
-      total: toAnalyze.length,
+      phase: 4,
+      message: `AI analyzed ${Math.min(b + BATCH_SIZE, emailsToAnalyze.length)} of ${emailsToAnalyze.length}`,
+      current: Math.min(b + BATCH_SIZE, emailsToAnalyze.length),
+      total: emailsToAnalyze.length,
     })
   }
 
-  // Apply AI results: filter out non-subscriptions, enhance real ones
-  const filtered = []
-  for (let i = 0; i < needsReview.length; i++) {
-    const item = needsReview[i]
-    const aiResult = allResults.get(i)
+  // Process results
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i]
+    const aiResult = allResults[i]
 
     if (!aiResult) {
-      // No AI result — keep item as-is
-      filtered.push(item)
+      // AI failed for this item — use the regex fallback data
+      if (candidate.regexSubscription) {
+        needsReview.push(candidate.regexSubscription)
+      }
       continue
     }
 
-    // If AI says NOT a subscription with high/medium confidence → remove it
-    if (!aiResult.isSubscription && (aiResult.confidence === 'high' || aiResult.confidence === 'medium')) {
-      console.log(`AI filtered out: ${item.name} — ${aiResult.reason}`)
-      continue // skip this item
+    // AI says NOT a subscription → filter it out
+    if (!aiResult.isSubscription && aiResult.confidence !== 'low') {
+      console.log(`AI filtered: ${candidate.emailData.domain} — ${aiResult.reason}`)
+      continue
     }
 
-    // If AI says IS a subscription → enhance with extracted data
-    if (aiResult.isSubscription) {
-      if (aiResult.serviceName && aiResult.confidence !== 'low') {
-        // Use AI name if current name looks generic (just a domain)
-        if (item.name === item._domain || !item.name) {
-          item.name = aiResult.serviceName
-        }
-      }
-      if (!item.amount && aiResult.amount) item.amount = aiResult.amount
-      if (!item.currency && aiResult.currency) item.currency = aiResult.currency
-      if (!item.billing_cycle && aiResult.billingCycle) item.billing_cycle = aiResult.billingCycle
-      if (!item.next_billing_date && aiResult.nextBillingDate) item.next_billing_date = aiResult.nextBillingDate
-      if (aiResult.status === 'cancelled') item.status = 'cancelled'
-      item.notes = `${item.notes || ''} (AI: ${aiResult.confidence})`.trim()
-      item._aiVerified = true
-      item._aiConfidence = aiResult.confidence
+    // AI says IS a subscription (or low confidence — keep for review)
+    const sub = candidate.regexSubscription || {}
+
+    // AI-extracted values override regex values
+    const aiName = aiResult.serviceName || sub.name
+    const aiAmount = aiResult.amount ?? sub.amount
+    const aiCurrency = aiResult.currency || sub.currency || 'USD'
+    const aiCycle = aiResult.billingCycle || sub.billing_cycle
+    const aiStatus = aiResult.status || sub.status || 'active'
+    const aiNextDate = aiResult.nextBillingDate || sub.next_billing_date
+
+    const subscription = {
+      name: aiName,
+      category: aiResult.serviceType || sub.category || 'other',
+      amount: aiAmount,
+      currency: aiCurrency,
+      billing_cycle: aiCycle,
+      status: aiStatus,
+      next_billing_date: aiNextDate,
+      last_email_date: sub.last_email_date,
+      logo_url: sub.logo_url,
+      notes: `Found via inbox scan (AI: ${aiResult.confidence})`,
+      _emailCount: sub._emailCount,
+      _confidence: aiResult.confidence,
+      _domain: sub._domain || candidate.emailData.domain,
+      _singleEmail: sub._singleEmail,
+      _isPending: aiStatus === 'pending',
+      _aiVerified: true,
     }
 
-    filtered.push(item)
+    // High confidence known services → confirmed; everything else → review
+    if (candidate.isKnown && aiResult.confidence === 'high' && aiResult.isSubscription) {
+      confirmed.push(subscription)
+    } else {
+      needsReview.push(subscription)
+    }
   }
 
   if (onProgress) onProgress({
-    phase: '4.5',
-    message: `AI done — kept ${filtered.length} of ${needsReview.length}`,
-    current: toAnalyze.length,
-    total: toAnalyze.length,
+    phase: 4,
+    message: `AI done — ${confirmed.length} confirmed, ${needsReview.length} for review`,
+    current: emailsToAnalyze.length,
+    total: emailsToAnalyze.length,
   })
 
-  return filtered
+  return { confirmed, needsReview }
 }

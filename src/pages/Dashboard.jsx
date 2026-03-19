@@ -192,6 +192,181 @@ const Dashboard = () => {
     setReviewItems(prev => prev.filter(r => r !== item))
   }
 
+  const handleAddAsCancelled = async (item) => {
+    try {
+      const dbSub = {}
+      for (const [key, value] of Object.entries(item)) {
+        if (!key.startsWith('_')) dbSub[key] = value
+      }
+      await createSubscription({
+        ...dbSub,
+        amount: dbSub.amount || 0,
+        billing_cycle: dbSub.billing_cycle || 'monthly',
+        status: 'cancelled',
+        user_id: user.id,
+      })
+      setReviewItems(prev => prev.filter(r => r !== item))
+      await loadSubscriptions()
+    } catch (err) {
+      console.warn('Failed to add as cancelled:', item.name, err)
+    }
+  }
+
+  // Helper: render a review card (used in both empty state and main dashboard)
+  const renderReviewCard = (item, idx) => {
+    const isCancelled = item._aiStatus === 'cancelled' || item._aiStatus === 'payment_failed' || item._aiStatus === 'expired' || item._aiStatus === 'possibly_cancelled'
+    const statusLabel = {
+      cancelled: 'Cancelled',
+      payment_failed: 'Payment Failed',
+      expired: 'Expired',
+      possibly_cancelled: 'Possibly Cancelled',
+    }[item._aiStatus] || null
+    const statusColor = {
+      cancelled: 'bg-red-100 text-red-700',
+      payment_failed: 'bg-yellow-100 text-yellow-700',
+      expired: 'bg-gray-100 text-gray-600',
+      possibly_cancelled: 'bg-amber-100 text-amber-700',
+    }[item._aiStatus] || ''
+
+    const paymentHistory = item._paymentHistory || []
+
+    return (
+      <div key={idx} className="bg-white rounded-lg p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            {item.logo_url ? (
+              <img src={item.logo_url} alt={item.name} className="w-8 h-8 rounded-full mt-1 flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-sm mt-1 flex-shrink-0">
+                {item.name?.charAt(0) || '?'}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={item.name || ''}
+                  onChange={(e) => handleEditReview(idx, 'name', e.target.value)}
+                  className="font-medium text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-orange-400 focus:outline-none flex-1 text-sm"
+                />
+                {statusLabel && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
+                    {statusLabel}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {item._emailCount} email{item._emailCount !== 1 ? 's' : ''} found · {item._domain}
+                {item.last_email_date && ` · Last: ${new Date(item.last_email_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                {item.next_billing_date && ` · Renews: ${new Date(item.next_billing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+              </p>
+              {paymentHistory.length > 0 && (
+                <p className="text-xs text-blue-600 mt-0.5">
+                  {paymentHistory.length} payment{paymentHistory.length !== 1 ? 's' : ''} found
+                  {paymentHistory.length > 0 && paymentHistory[0].amount && ` · Latest: ${paymentHistory[0].currency || '$'}${paymentHistory[0].amount}`}
+                  {paymentHistory.length > 1 && ` · Total: ${paymentHistory[0].currency || '$'}${paymentHistory.reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(2)}`}
+                </p>
+              )}
+              {item._singleEmail && !isCancelled && (
+                <p className="text-xs text-amber-600 mt-1">Only 1 email found — please confirm if this is still an active subscription</p>
+              )}
+              {item._isPending && (
+                <p className="text-xs text-yellow-600 mt-1">Upcoming subscription (no charge detected yet) — please enter the amount</p>
+              )}
+              {isCancelled && (
+                <p className="text-xs text-red-600 mt-1">This subscription appears to be no longer active. Add as cancelled to track history, or skip.</p>
+              )}
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs text-gray-500">Amount:</span>
+                <select
+                  value={item.currency || 'USD'}
+                  onChange={(e) => handleEditReview(idx, 'currency', e.target.value)}
+                  className="text-xs border border-gray-200 rounded px-1 py-0.5 bg-gray-50"
+                >
+                  <option value="USD">$</option>
+                  <option value="CAD">CA$</option>
+                  <option value="CNY">¥</option>
+                  <option value="EUR">€</option>
+                  <option value="GBP">£</option>
+                  <option value="AUD">A$</option>
+                  <option value="JPY">¥</option>
+                  <option value="KRW">₩</option>
+                  <option value="INR">₹</option>
+                  <option value="SGD">S$</option>
+                  <option value="HKD">HK$</option>
+                  <option value="TWD">NT$</option>
+                  <option value="MYR">RM</option>
+                  <option value="CHF">CHF</option>
+                  <option value="BRL">R$</option>
+                  <option value="SEK">kr</option>
+                </select>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={item.amount ?? ''}
+                  onChange={(e) => handleEditReview(idx, 'amount', e.target.value)}
+                  placeholder="—"
+                  className="w-20 text-xs border border-gray-200 rounded px-2 py-0.5 bg-gray-50 text-right"
+                />
+                <span className="text-xs text-gray-400">/</span>
+                <select
+                  value={item.billing_cycle || ''}
+                  onChange={(e) => handleEditReview(idx, 'billing_cycle', e.target.value)}
+                  className={`text-xs border rounded px-1 py-0.5 ${item.billing_cycle ? 'border-gray-200 bg-gray-50' : 'border-orange-300 bg-orange-50 text-orange-700'}`}
+                >
+                  <option value="">Select cycle</option>
+                  <option value="monthly">monthly</option>
+                  <option value="quarterly">quarterly</option>
+                  <option value="yearly">yearly</option>
+                  <option value="weekly">weekly</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1 flex-shrink-0 mt-1">
+            {!isCancelled ? (
+              <button
+                onClick={() => handleApproveReview(item)}
+                className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-medium hover:bg-green-200"
+              >
+                Add
+              </button>
+            ) : (
+              <button
+                onClick={() => handleApproveReview(item)}
+                className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-medium hover:bg-green-200"
+              >
+                Add as Active
+              </button>
+            )}
+            {isCancelled ? (
+              <button
+                onClick={() => handleAddAsCancelled(item)}
+                className="px-3 py-1 bg-orange-100 text-orange-700 rounded-lg text-xs font-medium hover:bg-orange-200"
+              >
+                Add as Cancelled
+              </button>
+            ) : (
+              <button
+                onClick={() => handleAddAsCancelled(item)}
+                className="px-3 py-1 bg-orange-100 text-orange-700 rounded-lg text-xs font-medium hover:bg-orange-200"
+              >
+                Past Sub
+              </button>
+            )}
+            <button
+              onClick={() => handleDismissReview(item)}
+              className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const handleCancelSub = async (sub) => {
     try {
       await updateSubscription(sub.id, { status: 'cancelled' })
@@ -363,100 +538,7 @@ const Dashboard = () => {
                 <h3 className="font-semibold text-orange-800 mb-3">Possible subscriptions — please confirm</h3>
                 <p className="text-xs text-orange-600 mb-3">You can edit name, amount, and billing cycle before adding.</p>
                 <div className="space-y-3">
-                  {reviewItems.map((item, idx) => (
-                    <div key={idx} className="bg-white rounded-lg p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          {item.logo_url ? (
-                            <img src={item.logo_url} alt={item.name} className="w-8 h-8 rounded-full mt-1 flex-shrink-0" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-sm mt-1 flex-shrink-0">
-                              {item.name?.charAt(0) || '?'}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <input
-                              type="text"
-                              value={item.name || ''}
-                              onChange={(e) => handleEditReview(idx, 'name', e.target.value)}
-                              className="font-medium text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-orange-400 focus:outline-none w-full text-sm"
-                            />
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {item._emailCount} email{item._emailCount !== 1 ? 's' : ''} found · {item._domain}
-                              {item.last_email_date && ` · Last: ${new Date(item.last_email_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                              {item.next_billing_date && ` · Renews: ${new Date(item.next_billing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                            </p>
-                            {item._singleEmail && (
-                              <p className="text-xs text-amber-600 mt-1">Only 1 email found — please confirm if this is still an active subscription</p>
-                            )}
-                            {item._isPending && (
-                              <p className="text-xs text-yellow-600 mt-1">Upcoming subscription (no charge detected yet) — please enter the amount</p>
-                            )}
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-xs text-gray-500">Amount:</span>
-                              <select
-                                value={item.currency || 'USD'}
-                                onChange={(e) => handleEditReview(idx, 'currency', e.target.value)}
-                                className="text-xs border border-gray-200 rounded px-1 py-0.5 bg-gray-50"
-                              >
-                                <option value="USD">$</option>
-                                <option value="CAD">CA$</option>
-                                <option value="CNY">¥</option>
-                                <option value="EUR">€</option>
-                                <option value="GBP">£</option>
-                                <option value="AUD">A$</option>
-                                <option value="JPY">¥</option>
-                                <option value="KRW">₩</option>
-                                <option value="INR">₹</option>
-                                <option value="SGD">S$</option>
-                                <option value="HKD">HK$</option>
-                                <option value="TWD">NT$</option>
-                                <option value="MYR">RM</option>
-                                <option value="CHF">CHF</option>
-                                <option value="BRL">R$</option>
-                                <option value="SEK">kr</option>
-                              </select>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.amount ?? ''}
-                                onChange={(e) => handleEditReview(idx, 'amount', e.target.value)}
-                                placeholder="—"
-                                className="w-20 text-xs border border-gray-200 rounded px-2 py-0.5 bg-gray-50 text-right"
-                              />
-                              <span className="text-xs text-gray-400">/</span>
-                              <select
-                                value={item.billing_cycle || ''}
-                                onChange={(e) => handleEditReview(idx, 'billing_cycle', e.target.value)}
-                                className={`text-xs border rounded px-1 py-0.5 ${item.billing_cycle ? 'border-gray-200 bg-gray-50' : 'border-orange-300 bg-orange-50 text-orange-700'}`}
-                              >
-                                <option value="">Select cycle</option>
-                                <option value="monthly">monthly</option>
-                                <option value="quarterly">quarterly</option>
-                                <option value="yearly">yearly</option>
-                                <option value="weekly">weekly</option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 flex-shrink-0 mt-1">
-                          <button
-                            onClick={() => handleApproveReview(item)}
-                            className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200"
-                          >
-                            Add
-                          </button>
-                          <button
-                            onClick={() => handleDismissReview(item)}
-                            className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200"
-                          >
-                            Skip
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  {reviewItems.map((item, idx) => renderReviewCard(item, idx))}
                 </div>
               </div>
             </div>
@@ -576,100 +658,7 @@ const Dashboard = () => {
             <h3 className="font-semibold text-orange-800 mb-3">Possible subscriptions — please confirm</h3>
             <p className="text-xs text-orange-600 mb-3">You can edit name, amount, and billing cycle before adding.</p>
             <div className="space-y-3">
-              {reviewItems.map((item, idx) => (
-                <div key={idx} className="bg-white rounded-lg p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      {item.logo_url ? (
-                        <img src={item.logo_url} alt={item.name} className="w-8 h-8 rounded-full mt-1 flex-shrink-0" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-sm mt-1 flex-shrink-0">
-                          {item.name?.charAt(0) || '?'}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <input
-                          type="text"
-                          value={item.name || ''}
-                          onChange={(e) => handleEditReview(idx, 'name', e.target.value)}
-                          className="font-medium text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-orange-400 focus:outline-none w-full text-sm"
-                        />
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {item._emailCount} email{item._emailCount !== 1 ? 's' : ''} found · {item._domain}
-                          {item.last_email_date && ` · Last: ${new Date(item.last_email_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                          {item.next_billing_date && ` · Renews: ${new Date(item.next_billing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                        </p>
-                        {item._singleEmail && (
-                          <p className="text-xs text-amber-600 mt-1">Only 1 email found — please confirm if this is still an active subscription</p>
-                        )}
-                        {item._isPending && (
-                          <p className="text-xs text-yellow-600 mt-1">Upcoming subscription (no charge detected yet) — please enter the amount</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs text-gray-500">Amount:</span>
-                          <select
-                            value={item.currency || 'USD'}
-                            onChange={(e) => handleEditReview(idx, 'currency', e.target.value)}
-                            className="text-xs border border-gray-200 rounded px-1 py-0.5 bg-gray-50"
-                          >
-                            <option value="USD">$</option>
-                            <option value="CAD">CA$</option>
-                            <option value="CNY">¥</option>
-                            <option value="EUR">€</option>
-                            <option value="GBP">£</option>
-                            <option value="AUD">A$</option>
-                            <option value="JPY">¥</option>
-                            <option value="KRW">₩</option>
-                            <option value="INR">₹</option>
-                            <option value="SGD">S$</option>
-                            <option value="HKD">HK$</option>
-                            <option value="TWD">NT$</option>
-                            <option value="MYR">RM</option>
-                            <option value="CHF">CHF</option>
-                            <option value="BRL">R$</option>
-                            <option value="SEK">kr</option>
-                          </select>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.amount ?? ''}
-                            onChange={(e) => handleEditReview(idx, 'amount', e.target.value)}
-                            placeholder="—"
-                            className="w-20 text-xs border border-gray-200 rounded px-2 py-0.5 bg-gray-50 text-right"
-                          />
-                          <span className="text-xs text-gray-400">/</span>
-                          <select
-                            value={item.billing_cycle || ''}
-                            onChange={(e) => handleEditReview(idx, 'billing_cycle', e.target.value)}
-                            className={`text-xs border rounded px-1 py-0.5 ${item.billing_cycle ? 'border-gray-200 bg-gray-50' : 'border-orange-300 bg-orange-50 text-orange-700'}`}
-                          >
-                            <option value="">Select cycle</option>
-                            <option value="monthly">monthly</option>
-                            <option value="quarterly">quarterly</option>
-                            <option value="yearly">yearly</option>
-                            <option value="weekly">weekly</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0 mt-1">
-                      <button
-                        onClick={() => handleApproveReview(item)}
-                        className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200"
-                      >
-                        Add
-                      </button>
-                      <button
-                        onClick={() => handleDismissReview(item)}
-                        className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200"
-                      >
-                        Skip
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              {reviewItems.map((item, idx) => renderReviewCard(item, idx))}
             </div>
           </div>
         </div>

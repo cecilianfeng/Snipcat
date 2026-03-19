@@ -1794,80 +1794,95 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
   // PHASE 4: Fetch email bodies + AI analysis
   // ════════════════════════════════════════════════
   // For each candidate domain:
-  // 1. Fetch the most recent email body
+  // 1. Fetch up to 3 recent email bodies (for richer AI context)
   // 2. Build regex-based fallback data (name, price, cycle)
   // 3. Send to Claude AI for final determination
   //
   // AI is the PRIMARY judge — it decides if something is a subscription,
-  // extracts the correct name/amount/cycle, and filters out false positives.
+  // extracts the correct name/amount/cycle, detects cancellations,
+  // and filters out false positives.
   if (onProgress) onProgress({ phase: 4, message: 'Reading emails...', current: 0, total: passedDomains.length })
 
   const aiCandidates = [] // will be sent to AI
+  const MAX_EMAILS_TO_AI = 3 // send up to 3 emails per candidate for context
 
   for (let i = 0; i < passedDomains.length; i++) {
     const { domain, emails, frequency, isKnown, _unknownWithBilling } = passedDomains[i]
 
-    const newestEmail = emails.sort((a, b) => b.date - a.date)[0]
-    const fullMsg = await getFullMessage(token, newestEmail.id)
+    const sortedEmails = emails.sort((a, b) => b.date - a.date)
+    const newestEmail = sortedEmails[0]
+    const lastEmailDate = newestEmail.date.toISOString()
 
-    let bodyText = ''
+    // Fetch up to MAX_EMAILS_TO_AI email bodies for AI context
+    const emailsToFetch = sortedEmails.slice(0, MAX_EMAILS_TO_AI)
+    const emailDataList = [] // will hold {subject, bodyText, from, domain, date} for each
+    let bodyText = '' // combined text for regex fallback
     let priceResult = null
     let cycle = null
     let nextDate = null
-    const lastEmailDate = newestEmail.date.toISOString()
 
-    if (fullMsg) {
-      bodyText = decodeBody(fullMsg.payload)
-      const fullText = `${newestEmail.subject} ${bodyText}`
+    for (const email of emailsToFetch) {
+      const fullMsg = await getFullMessage(token, email.id)
+      if (!fullMsg) continue
 
-      // Regex fallback: extract price
-      priceResult = extractAmountAndCurrency(fullText)
+      const emailBody = decodeBody(fullMsg.payload)
+      if (!emailBody && emailDataList.length > 0) continue // skip empty bodies after first
 
-      // Try PDF if no price in body
-      if (!priceResult) {
-        const pdfs = findPdfAttachments(fullMsg)
-        for (const pdf of pdfs) {
-          try {
-            const attachData = await getAttachment(token, newestEmail.id, pdf.attachmentId)
-            if (attachData) {
-              const pdfText = await extractPdfText(attachData)
-              if (pdfText) {
-                priceResult = extractAmountAndCurrency(pdfText)
-                if (priceResult) { bodyText = bodyText + ' ' + pdfText; break }
+      const lookupDomain = domain.includes(':') && !domain.startsWith('stripe:')
+        ? domain.split(':')[0]
+        : domain
+
+      emailDataList.push({
+        subject: email.subject || '',
+        bodyText: emailBody || '',
+        from: email.from || '',
+        domain: lookupDomain || domain,
+        date: email.date.toISOString().split('T')[0],
+      })
+
+      // For the newest email, also do regex extraction as fallback
+      if (email === newestEmail) {
+        bodyText = emailBody || ''
+        const fullText = `${email.subject} ${bodyText}`
+        priceResult = extractAmountAndCurrency(fullText)
+
+        // Try PDF if no price in body
+        if (!priceResult) {
+          const pdfs = findPdfAttachments(fullMsg)
+          for (const pdf of pdfs) {
+            try {
+              const attachData = await getAttachment(token, email.id, pdf.attachmentId)
+              if (attachData) {
+                const pdfText = await extractPdfText(attachData)
+                if (pdfText) {
+                  priceResult = extractAmountAndCurrency(pdfText)
+                  if (priceResult) { bodyText = bodyText + ' ' + pdfText; break }
+                }
               }
-            }
-          } catch (err) { /* skip */ }
+            } catch (err) { /* skip */ }
+          }
         }
-      }
 
-      // Try second email if still no price
-      if (!priceResult && emails.length >= 2) {
-        const secondEmail = emails.sort((a, b) => b.date - a.date)[1]
-        const secondMsg = await getFullMessage(token, secondEmail.id)
-        if (secondMsg) {
-          const secondBody = decodeBody(secondMsg.payload)
-          priceResult = extractAmountAndCurrency(`${secondEmail.subject} ${secondBody}`)
-          if (!priceResult) bodyText = bodyText + ' ' + secondBody
-        }
+        const combinedText = `${email.subject} ${bodyText}`
+        cycle = frequency.cycle || detectBillingCycle(combinedText)
+        nextDate = extractNextBillingDate(combinedText)
+      } else if (!priceResult) {
+        // Try to get price from older emails too (regex fallback)
+        const altPrice = extractAmountAndCurrency(`${email.subject} ${emailBody}`)
+        if (altPrice) priceResult = altPrice
       }
-
-      const combinedText = `${newestEmail.subject} ${bodyText}`
-      cycle = frequency.cycle || detectBillingCycle(combinedText)
-      nextDate = extractNextBillingDate(combinedText)
     }
 
-    // For Apple App Store: fetch multiple emails to capture all apps
+    // For Apple App Store: each email may be a different app subscription
     const isApple = domain === 'apple.com' || domain.endsWith('.apple.com')
     if (isApple && emails.length > 1) {
-      // Send up to 5 Apple emails to AI — each may be a different app
-      const recentEmails = emails.sort((a, b) => b.date - a.date).slice(0, 5)
+      const recentEmails = sortedEmails.slice(0, 5)
       for (const appleEmail of recentEmails) {
         const appleMsg = await getFullMessage(token, appleEmail.id)
         if (!appleMsg) continue
         const appleBody = decodeBody(appleMsg.payload)
         if (!appleBody) continue
 
-        const lookupDomain = 'apple.com'
         const regexSub = {
           name: 'App Store',
           category: 'entertainment',
@@ -1891,12 +1906,15 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
           emails,
           frequency,
           isKnown: true,
-          emailData: {
+          emailDataList: [{
             subject: appleEmail.subject || '',
             bodyText: appleBody,
             from: appleEmail.from || '',
-            domain: lookupDomain,
-          },
+            domain: 'apple.com',
+            date: appleEmail.date.toISOString().split('T')[0],
+          }],
+          totalEmailCount: emails.length,
+          lastEmailDate: appleEmail.date.toISOString(),
           regexSubscription: regexSub,
         })
       }
@@ -1907,7 +1925,7 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
         current: i + 1,
         total: passedDomains.length,
       })
-      continue // Apple handled above, skip normal flow
+      continue
     }
 
     // Build regex fallback subscription object
@@ -1968,12 +1986,15 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
       emails,
       frequency,
       isKnown,
-      emailData: {
+      emailDataList: emailDataList.length > 0 ? emailDataList : [{
         subject: newestEmail.subject || '',
         bodyText: bodyText || '',
         from: newestEmail.from || '',
         domain: lookupDomain || domain,
-      },
+        date: newestEmail.date.toISOString().split('T')[0],
+      }],
+      totalEmailCount: emails.length,
+      lastEmailDate,
       regexSubscription,
     })
 

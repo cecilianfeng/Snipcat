@@ -92,7 +92,11 @@ const Dashboard = () => {
         if (!existing) {
           // New subscription — create it
           try {
-            const { _emailCount, _confidence, _domain, ...dbSub } = sub
+            // Strip ALL internal fields (underscore-prefixed) before saving to DB
+            const dbSub = {}
+            for (const [key, value] of Object.entries(sub)) {
+              if (!key.startsWith('_')) dbSub[key] = value
+            }
             await createSubscription({ ...dbSub, amount: dbSub.amount || 0, user_id: user.id })
             addedCount++
           } catch (err) {
@@ -166,7 +170,11 @@ const Dashboard = () => {
 
   const handleApproveReview = async (item) => {
     try {
-      const { _emailCount, _confidence, _domain, ...dbSub } = item
+      // Strip ALL internal fields (underscore-prefixed) before saving to DB
+      const dbSub = {}
+      for (const [key, value] of Object.entries(item)) {
+        if (!key.startsWith('_')) dbSub[key] = value
+      }
       await createSubscription({
         ...dbSub,
         amount: dbSub.amount || 0,
@@ -376,6 +384,7 @@ const Dashboard = () => {
                             <p className="text-xs text-gray-400 mt-0.5">
                               {item._emailCount} email{item._emailCount !== 1 ? 's' : ''} found · {item._domain}
                               {item.last_email_date && ` · Last: ${new Date(item.last_email_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                              {item.next_billing_date && ` · Renews: ${new Date(item.next_billing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
                             </p>
                             {item._singleEmail && (
                               <p className="text-xs text-amber-600 mt-1">Only 1 email found — please confirm if this is still an active subscription</p>
@@ -587,6 +596,8 @@ const Dashboard = () => {
                         />
                         <p className="text-xs text-gray-400 mt-0.5">
                           {item._emailCount} email{item._emailCount !== 1 ? 's' : ''} found · {item._domain}
+                          {item.last_email_date && ` · Last: ${new Date(item.last_email_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                          {item.next_billing_date && ` · Renews: ${new Date(item.next_billing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
                         </p>
                         {item._singleEmail && (
                           <p className="text-xs text-amber-600 mt-1">Only 1 email found — please confirm if this is still an active subscription</p>

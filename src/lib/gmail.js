@@ -384,28 +384,49 @@ function extractPlatformSubName(domain, from, subject, bodyText) {
   }
 
   // Strategy 2: Extract from subject using platform-specific patterns
-  for (const pattern of platformInfo.subjectPatterns) {
-    const match = subject.match(pattern)
-    if (match) {
-      let name = match[1].trim()
-        .replace(/[#\-–—]\s*\d+.*$/, '') // remove invoice numbers
-        .replace(/\s*(?:Inc|LLC|Ltd|B\.V\.).*$/i, '')
-        .trim()
-      if (name.length > 1 && name.length < 80) return name
+  if (platformInfo.subjectPatterns) {
+    for (const pattern of platformInfo.subjectPatterns) {
+      const match = subject.match(pattern)
+      if (match) {
+        let name = match[1].trim()
+          .replace(/[#\-–—]\s*\d+.*$/, '') // remove invoice numbers
+          .replace(/\s*(?:Inc|LLC|Ltd|B\.V\.).*$/i, '')
+          .trim()
+        if (name.length > 1 && name.length < 80) return name
+      }
     }
   }
 
-  // Strategy 3: Extract from body — "Receipt from [Name]"
+  // Strategy 3: Extract from body text
   if (bodyText) {
     const bodyPatterns = [
-      /receipt from\s+(.+?)(?:\s*Thank|\s*$|\.\s)/im,
+      // "Receipt from Lenny's Newsletter" / "Payment receipt from ..."
+      /(?:payment\s+)?receipt\s+from\s+(.+?)(?:\s*Thank|\s*\n|\.\s|#\d)/im,
+      // "Your subscription to Lenny's Newsletter"
+      /subscription\s+to\s+(.+?)(?:\s+has|\s+is|\s+was|\s*\n|\.\s)/im,
+      // "paid subscription" context: "Lenny's Newsletter paid subscription"
+      /(.+?)\s+paid\s+subscription/im,
     ]
     for (const p of bodyPatterns) {
       const match = bodyText.match(p)
       if (match) {
         let name = match[1].trim().replace(/[.,]$/, '').trim()
+        // Skip platform name itself
+        if (name.toLowerCase() === platformInfo.platform.toLowerCase()) continue
         if (name.length > 1 && name.length < 80) return name
       }
+    }
+  }
+
+  // Strategy 4: Extract from subject — generic "from X" pattern (broader)
+  const fromMatch = subject.match(/from\s+(.+?)$/i)
+  if (fromMatch) {
+    let name = fromMatch[1].trim()
+      .replace(/[#\-–—]\s*\d+.*$/, '')
+      .replace(/\s*(?:Inc|LLC|Ltd|B\.V\.).*$/i, '')
+      .trim()
+    if (name.length > 1 && name.length < 80 && name.toLowerCase() !== platformInfo.platform.toLowerCase()) {
+      return name
     }
   }
 
@@ -418,36 +439,90 @@ const BLOCKLIST = [
   'bell.ca', 'bell.net', 'rogers.com', 'telus.com', 'fido.ca', 'koodo.com',
   'virginmobile', 'virginplus', 'shaw.ca', 'att.com', 'att.net', 'verizon.com',
   'tmobile.com', 't-mobile.com', 'comcast.com', 'xfinity.com', 'spectrum.com',
-  'hydroone', 'enbridge', 'fortisbc', 'bchydro',
+  'hydroone', 'enbridge', 'fortisbc', 'bchydro', 'torontohydro', 'alectra',
+  'puc.on.ca', 'hydroottawa', 'epcor.com', 'bge.com', 'coned.com', 'pge.com',
+  'sce.com', 'duke-energy', 'nationalgrid', 'dominion', 'firstenergy',
+  // Water utilities
+  'toronto.ca', 'peelregion', 'york.ca', 'halton.ca', 'durham.ca',
+  'regionofwaterloo', 'cityofhamilton', 'cityofottawa', 'cityofvancouver',
   // Insurance
   'equitable', 'sunlife', 'manulife', 'greatwest', 'desjardins',
   'statefarm', 'allstate', 'geico', 'progressive.com',
-  // Retailers
+  'intact.net', 'cooperators', 'aviva.ca', 'td insurance',
+  // Retailers / Shopping / Fashion
   'bestbuy', 'walmart', 'costco', 'target.com', 'ikea',
   'homedepot', 'lowes', 'staples', 'winners', 'marshalls',
   'aritzia', 'zara.com', 'hm.com', 'uniqlo', 'gap.com', 'oldnavy',
   'lululemon', 'oakandfort', 'oak+fort', 'sephora', 'ulta', 'nordstrom',
   'shein', 'fashionnova', 'ssense', 'farfetch', 'abercrombie',
-  // Transportation / Car
+  'arcteryx', 'arc\'teryx', 'ralphlauren', 'polo', 'alexanderwang',
+  'urbanoutfitters', 'anthropologie', 'freepeople', 'jcrew', 'macys',
+  'bloomingdales', 'saksfifth', 'neimanmarcus', 'coach.com', 'gucci',
+  'prada', 'louisvuitton', 'lvmh', 'burberry', 'balenciaga', 'dior',
+  'chanel.com', 'hermes.com', 'tiffany', 'cartier', 'rolex',
+  'ladym', 'lady m', 'petsmart', 'petco', 'chewy.com',
+  'indigo.ca', 'chapters.ca', 'bookdepository', 'bookroom',
+  'asiabookroom', 'abebooks', 'thriftbooks',
+  // Transportation / Airlines / Car
   'uber.com', 'lyft.com', 'turo.com', 'enterprise.com', 'hertz.com',
-  '407etr', '407 etr',
-  // Food delivery
+  '407etr', '407 etr', 'presto', 'transit', 'compass card',
+  'aircanada', 'air canada', 'westjet', 'united.com', 'delta.com',
+  'americanairlines', 'southwest', 'alaskaair', 'jetblue',
+  'expedia.com', 'kayak.com', 'skyscanner', 'hopper.com',
+  'flighthub', 'google flights',
+  // Food / Restaurant / Delivery
   'doordash', 'ubereats', 'skipthedishes', 'grubhub', 'instacart',
+  'hellofresh', 'goodfood', 'chefplate', 'freshprep',
+  'starbucks', 'timhortons', 'mcdonalds', 'subway', 'dominos',
   // Banks / Finance
   'paypal.com', 'venmo.com', 'interac', 'scotiabank', 'tdbank', 'td.com',
   'rbc.com', 'rbcroyalbank', 'bmo.com', 'cibc.com',
   'americanexpress', 'chase.com', 'capitalone',
+  'pcfinancial', 'simplii', 'tangerine', 'eq bank', 'wealthsimple',
+  'questrade', 'interactive brokers',
   // Government
-  'cra-arc', 'canada.ca', 'irs.gov',
+  'cra-arc', 'canada.ca', 'irs.gov', 'servicecanada', 'serviceontario',
   // Shipping
   'fedex.com', 'ups.com', 'usps.com', 'canadapost', 'dhl.com', 'purolator',
-  // Travel
+  // Travel / Hotels
   'airbnb.com', 'booking.com', 'expedia.com', 'hotels.com',
+  'marriott', 'hilton', 'hyatt', 'ihg', 'bestwestern',
+  'vrbo', 'tripadvisor',
   // Physical services (not SaaS)
   'accessstorage', 'storagemart', 'publicstore',
   // Real estate
   'zillow', 'realtor.com', 'redfin',
+  // Education institutions (not SaaS)
+  'brainstation', 'generalassemb', 'bootcamp', 'university', 'college',
+  // Gmail itself
+  'gmail.com',
 ]
+
+// ─── STRONG SUBSCRIPTION INDICATORS ───
+// For UNKNOWN brands (not in KNOWN_SUBSCRIPTIONS), we require these stronger
+// signals. Generic words like "receipt" and "invoice" are NOT enough because
+// shopping receipts also have those. Only pass unknown brands if the email
+// contains one of these explicit subscription/recurring signals.
+const STRONG_SUBSCRIPTION_KEYWORDS = [
+  'subscription', 'membership', 'renewal', 'auto-renew', 'auto-renewal',
+  'recurring', 'billing cycle', 'billing period', 'renew each',
+  'monthly charge', 'annual charge', 'yearly plan', 'monthly plan',
+  'your plan', 'plan renewal', 'auto renewing', 'subscription renewed',
+  'subscriber', 'renews on', 'next billing', 'premium member',
+  'pro plan', 'team plan', 'business plan', 'starter plan',
+  '订阅', '会员', '续费', '自动续费', '连续包月', '连续包年',
+]
+
+/**
+ * Check if email subject/text contains STRONG subscription signals.
+ * This is stricter than hasBillingEvidence — used for unknown brands
+ * to avoid false positives from shopping receipts.
+ */
+function hasStrongSubscriptionEvidence(text) {
+  if (!text) return false
+  const lower = text.toLowerCase()
+  return STRONG_SUBSCRIPTION_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()))
+}
 
 // ─── BILLING / RECEIPT KEYWORDS (email must have at least one) ───
 const BILLING_KEYWORDS = [
@@ -1280,6 +1355,36 @@ function extractAppleAppDetails(bodyText) {
     }
   }
 
+  // ── Pattern 3: Chinese Apple receipts — "AppName  description  ¥XX.XX" table rows ──
+  // Apple often sends a table: "全民K歌-唱歌录歌首选  1个月全民K歌会员  ¥19.00"
+  if (apps.length === 0) {
+    // Look for Chinese app name followed by price in a table-like layout
+    const chineseAppPattern = /([\u4e00-\u9fff][\u4e00-\u9fffA-Za-z0-9\-·.]{1,30}?)[\s\S]{0,100}?([¥￥$€£₹₩])\s*(\d{1,6}(?:\.\d{2})?)/g
+    let cm
+    while ((cm = chineseAppPattern.exec(bodyText)) !== null) {
+      let appName = cm[1].trim()
+        .replace(/[-\s]*(?:唱歌|录歌|首选|工具|助手|日记|记账|小说|漫画|视频|音乐|游戏|社区|平台|商城|市场).*$/i, '')
+        .trim()
+      // Skip boilerplate
+      const skipChinese = ['订阅', '续期', '收据', '账单', '苹果', '发票', '报告', '此致']
+      if (appName.length < 2 || skipChinese.some(s => appName === s)) continue
+
+      const symbol = cm[2]
+      const amount = parseFloat(cm[3])
+      const currency = currencyMap[symbol] || 'CNY'
+
+      // Check surrounding context for cycle info
+      const context = bodyText.slice(Math.max(0, cm.index - 50), cm.index + 200)
+      let cycle = null
+      if (/monthly|包月|连续包月|每月|\/month|1\s*month|1个月/i.test(context)) cycle = 'monthly'
+      else if (/yearly|annual|包年|每年|年度|\/year|1\s*year/i.test(context)) cycle = 'yearly'
+
+      if (!apps.some(a => a.appName === appName)) {
+        apps.push({ appName, amount, currency, cycle, renewDate: null })
+      }
+    }
+  }
+
   return apps
 }
 
@@ -1653,10 +1758,11 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
         })
       }
     } else if (!isKnown && emails.length >= 1) {
-      // UNKNOWN brands: if emails have strong billing evidence, still pass them to needsReview.
-      // This ensures services not in our known list (e.g. BrandCrowd, Medium) can still be detected.
-      const hasBilling = emails.some(e => hasBillingEvidence(e.subject))
-      if (hasBilling) {
+      // UNKNOWN brands: only pass if emails have STRONG subscription signals.
+      // Generic "receipt"/"invoice" are NOT enough — shopping receipts have those too.
+      // Must contain explicit subscription/recurring keywords to avoid false positives.
+      const hasStrong = emails.some(e => hasStrongSubscriptionEvidence(e.subject))
+      if (hasStrong) {
         passedDomains.push({
           domain,
           emails,

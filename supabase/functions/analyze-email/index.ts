@@ -3,6 +3,69 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = "claude-sonnet-4-6";
 const MAX_BODY_CHARS = 2500;
+const META_FETCH_TIMEOUT = 3000; // 3s timeout for fetching domain meta
+
+/**
+ * Fetch homepage title and meta description for a domain.
+ * Returns { title, description } or null on failure.
+ */
+async function fetchDomainMeta(domain: string): Promise<{ title: string; description: string } | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), META_FETCH_TIMEOUT);
+
+    const url = `https://${domain}`;
+    const resp = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; SnipKitty/1.0)",
+        "Accept": "text/html",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) return null;
+
+    // Only read first 20KB to find meta tags quickly
+    const reader = resp.body?.getReader();
+    if (!reader) return null;
+
+    let html = "";
+    const decoder = new TextDecoder();
+    while (html.length < 20000) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      html += decoder.decode(value, { stream: true });
+    }
+    reader.cancel();
+
+    // Extract <title>
+    const titleMatch = html.match(/<title[^>]*>([^<]{1,200})<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : "";
+
+    // Extract <meta name="description" content="...">
+    const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']{1,500})["'][^>]*>/i)
+      || html.match(/<meta[^>]*content=["']([^"']{1,500})["'][^>]*name=["']description["'][^>]*>/i);
+    const description = descMatch ? descMatch[1].trim() : "";
+
+    // Also try og:description as fallback
+    let ogDesc = "";
+    if (!description) {
+      const ogMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']{1,500})["'][^>]*>/i)
+        || html.match(/<meta[^>]*content=["']([^"']{1,500})["'][^>]*property=["']og:description["'][^>]*>/i);
+      ogDesc = ogMatch ? ogMatch[1].trim() : "";
+    }
+
+    const finalDesc = description || ogDesc;
+    if (!title && !finalDesc) return null;
+
+    return { title, description: finalDesc };
+  } catch {
+    // Timeout, network error, etc. — not critical
+    return null;
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -103,13 +166,20 @@ Not every email from a sender is a billing email. You MUST distinguish:
 Only use dates and amounts from BILLING emails. If the newest email is a verification code but an older email is a receipt, use the older email's date as last billed date.
 
 ## BUSINESS TYPE INFERENCE
-Read the email content to determine what kind of business this is:
-- Look for clues: product descriptions, shipping addresses, physical items = NOT digital subscription
-- "Your order", clothing sizes, tracking numbers, delivery estimates = physical retail
-- "Appointment", "visit", clinic/office address = in-person service
-- "Policy", "coverage", "premium", insurance terminology = insurance (not a digital subscription)
-- Software features, account access, digital tools, cloud services = likely digital subscription
-Use these clues to determine if the DIGITAL criterion is met, even if you don't recognize the company name.
+You will receive TWO sources of information about each company:
+
+1. **Company website info** (title + description from their homepage): This tells you what the company actually does. Use it as PRIMARY evidence for business type. For example:
+   - "GANNI — Scandinavian fashion brand" → physical retail, NOT a subscription
+   - "ls.graphics — Premium mockups and design assets" → digital design tool, likely subscription
+   - "NordVPN — Online VPN service" → digital security service, likely subscription
+
+2. **Email content clues** (use as SECONDARY evidence):
+   - "Your order", clothing sizes, tracking numbers, delivery estimates = physical retail
+   - "Appointment", "visit", clinic/office address = in-person service
+   - "Policy", "coverage", "premium", insurance terminology = insurance (not a digital subscription)
+   - Software features, account access, digital tools, cloud services = likely digital subscription
+
+When website info and email content agree, you can be confident. When they conflict, trust the website info more — it tells you the company's core business.
 
 ## STATUS DETECTION
 Analyze the newest BILLING email (not verification codes or marketing):
@@ -148,7 +218,7 @@ async function analyzeCandidate(candidate: {
   totalEmailCount?: number;
   lastEmailDate?: string;
   currentDate?: string;
-}) {
+}, preloadedMeta?: { title: string; description: string } | null) {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not set");
 
   const emailParts = candidate.emails.map((email, idx) => {
@@ -158,11 +228,17 @@ async function analyzeCandidate(candidate: {
     return `--- Email ${idx + 1} (${email.date || 'unknown date'}) ---\nFrom: ${email.from}\nSubject: ${email.subject}\n\n${truncatedBody}`;
   }).join("\n\n");
 
+  // Use preloaded meta if available, otherwise fetch on the fly
+  const meta = preloadedMeta !== undefined ? preloadedMeta : await fetchDomainMeta(candidate.domain);
+  const metaSection = meta
+    ? `\nCompany website info (from ${candidate.domain} homepage):\n- Title: ${meta.title}\n- Description: ${meta.description}\nUse this to help determine what this company does and whether it's a digital service.\n`
+    : `\nCompany website info: Could not be retrieved for ${candidate.domain}. Rely on email content only.\n`;
+
   const userPrompt = `Domain: ${candidate.domain}
 Total emails from this sender: ${candidate.totalEmailCount || candidate.emails.length}
 Last email date: ${candidate.lastEmailDate || 'unknown'}
 Today's date: ${candidate.currentDate || new Date().toISOString().split('T')[0]}
-
+${metaSection}
 ${emailParts}
 
 Analyze these emails. Is this a PAID RECURRING DIGITAL subscription? Extract all details you can find. Remember: read the FULL email body for amounts, and default to isSubscription: false when unsure.`;
@@ -211,10 +287,18 @@ serve(async (req: Request) => {
 
     if (candidates && Array.isArray(candidates) && candidates.length > 0) {
       const batch = candidates.slice(0, 8);
+
+      // Pre-fetch all domain metas in parallel (3s timeout each, non-blocking)
+      const domains = [...new Set(batch.map((c: any) => c.domain))];
+      const metaResults = await Promise.all(domains.map(d => fetchDomainMeta(d).catch(() => null)));
+      const metaMap = new Map<string, { title: string; description: string } | null>();
+      domains.forEach((d, i) => metaMap.set(d, metaResults[i]));
+
       const results = await Promise.all(
         batch.map(async (candidate: any) => {
           try {
-            return await analyzeCandidate(candidate);
+            const meta = metaMap.get(candidate.domain) ?? null;
+            return await analyzeCandidate(candidate, meta);
           } catch (error) {
             console.error("Error analyzing candidate:", candidate.domain, error);
             return {

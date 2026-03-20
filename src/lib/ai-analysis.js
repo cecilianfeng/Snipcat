@@ -142,13 +142,13 @@ export async function analyzeWithAI(candidates, onProgress) {
       continue
     }
 
-    // AI says NOT a subscription → filter out
-    if (!aiResult.isSubscription && aiResult.confidence !== 'low') {
+    // AI says NOT a subscription → filter out (regardless of confidence)
+    if (!aiResult.isSubscription) {
       console.log(`AI filtered: ${candidate.domain} — ${aiResult.reason}`)
       continue
     }
 
-    // AI says IS a subscription (or low confidence — keep for review)
+    // AI says IS a subscription
     const sub = candidate.regexSubscription || {}
 
     // AI-extracted values override regex values
@@ -192,7 +192,7 @@ export async function analyzeWithAI(candidates, onProgress) {
       'slack': 'slack.com', 'spotify': 'spotify.com',
       'netflix': 'netflix.com', 'disney': 'disney.com',
       'chatgpt': 'openai.com', 'openai': 'openai.com',
-      'claude': 'anthropic.com', 'cursor': 'cursor.com',
+      'claude': 'claude.ai', 'cursor': 'cursor.com',
       'canva': 'canva.com', 'github': 'github.com',
       'vercel': 'vercel.com', 'cloudflare': 'cloudflare.com',
       'google one': 'google.com', 'google workspace': 'google.com',

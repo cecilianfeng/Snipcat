@@ -234,12 +234,19 @@ const Dashboard = () => {
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
             {item.logo_url ? (
-              <img src={item.logo_url} alt={item.name} className="w-8 h-8 rounded-full mt-1 flex-shrink-0" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-sm mt-1 flex-shrink-0">
-                {item.name?.charAt(0) || '?'}
-              </div>
-            )}
+              <img
+                src={item.logo_url}
+                alt={item.name}
+                className="w-8 h-8 rounded-full mt-1 flex-shrink-0"
+                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+              />
+            ) : null}
+            <div
+              className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-sm mt-1 flex-shrink-0"
+              style={{ display: item.logo_url ? 'none' : 'flex' }}
+            >
+              {item.name?.charAt(0) || '?'}
+            </div>
             <div className="flex-1 min-w-0">
               <input
                 type="text"
@@ -337,12 +344,19 @@ const Dashboard = () => {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {item.logo_url ? (
-              <img src={item.logo_url} alt={item.name} className="w-7 h-7 rounded-full flex-shrink-0" />
-            ) : (
-              <div className="w-7 h-7 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                {item.name?.charAt(0) || '?'}
-              </div>
-            )}
+              <img
+                src={item.logo_url}
+                alt={item.name}
+                className="w-7 h-7 rounded-full flex-shrink-0"
+                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+              />
+            ) : null}
+            <div
+              className="w-7 h-7 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center font-bold text-xs flex-shrink-0"
+              style={{ display: item.logo_url ? 'none' : 'flex' }}
+            >
+              {item.name?.charAt(0) || '?'}
+            </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-700 truncate">{item.name}</p>
               <p className="text-xs text-gray-400">
@@ -846,12 +860,19 @@ const Dashboard = () => {
                 >
                   <div className="flex items-center gap-4 flex-1">
                     {sub.logo_url ? (
-                      <img src={sub.logo_url} alt={sub.name} className="w-12 h-12 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-lg flex-shrink-0">
-                        {getInitial(sub.name)}
-                      </div>
-                    )}
+                      <img
+                        src={sub.logo_url}
+                        alt={sub.name}
+                        className="w-12 h-12 rounded-full object-cover"
+                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+                      />
+                    ) : null}
+                    <div
+                      className="w-12 h-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-lg flex-shrink-0"
+                      style={{ display: sub.logo_url ? 'none' : 'flex' }}
+                    >
+                      {getInitial(sub.name)}
+                    </div>
                     <div>
                       <p className={`font-semibold text-gray-900 ${sub.status === 'cancelled' ? 'line-through text-gray-500' : ''}`}>
                         {sub.name}

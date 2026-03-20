@@ -206,7 +206,7 @@ export async function analyzeWithAI(candidates, onProgress) {
     }
     for (const [name, domain] of Object.entries(knownLogoDomains)) {
       if (serviceNameLower.includes(name)) {
-        logoUrl = `https://logo.clearbit.com/${domain}`
+        logoUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
         break
       }
     }

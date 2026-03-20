@@ -458,7 +458,7 @@ const Dashboard = () => {
   const monthlyTotal = calcMonthlyTotal(subscriptions)
   const yearlyTotal = calcYearlyTotal(subscriptions)
   const displayTotal = costView === 'monthly' ? monthlyTotal : yearlyTotal
-  const upcoming = getUpcomingRenewals(subscriptions, 7)
+  const upcoming = getUpcomingRenewals(subscriptions, 14)
   const cancelledSavings = costView === 'monthly'
     ? calcCancelledSavingsMonthly(subscriptions)
     : calcCancelledSavingsYearly(subscriptions)

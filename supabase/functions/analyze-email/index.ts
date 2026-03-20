@@ -96,8 +96,23 @@ Assign the most specific category from this exact list:
 
 Think carefully about what the service actually does. Cloudflare → "hosting". Google One → "cloud-storage". WPS Office → "productivity". NordVPN → "security".
 
+## EMAIL TYPE AWARENESS
+Not every email from a sender is a billing email. You MUST distinguish:
+- **Billing emails**: receipts, invoices, payment confirmations, renewal notices — these have dates and amounts
+- **Non-billing emails**: verification codes, password resets, marketing, feature updates, login alerts, welcome emails — IGNORE these for date/amount extraction
+Only use dates and amounts from BILLING emails. If the newest email is a verification code but an older email is a receipt, use the older email's date as last billed date.
+
+## BUSINESS TYPE INFERENCE
+Read the email content to determine what kind of business this is:
+- Look for clues: product descriptions, shipping addresses, physical items = NOT digital subscription
+- "Your order", clothing sizes, tracking numbers, delivery estimates = physical retail
+- "Appointment", "visit", clinic/office address = in-person service
+- "Policy", "coverage", "premium", insurance terminology = insurance (not a digital subscription)
+- Software features, account access, digital tools, cloud services = likely digital subscription
+Use these clues to determine if the DIGITAL criterion is met, even if you don't recognize the company name.
+
 ## STATUS DETECTION
-Analyze the newest email first:
+Analyze the newest BILLING email (not verification codes or marketing):
 - "active": Recent successful payment, renewal confirmation, or active plan notice
 - "cancelled": "cancelled", "cancellation confirmed", "subscription ended", "you won't be charged"
 - "payment_failed": "payment failed", "declined", "billing issue", "update payment method"

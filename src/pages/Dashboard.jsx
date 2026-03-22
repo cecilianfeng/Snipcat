@@ -13,6 +13,7 @@ import {
   Inbox,
   Loader2,
   CheckCircle,
+  Scissors,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -230,19 +231,19 @@ const Dashboard = () => {
     const realIdx = getRealIndex(item)
     const paymentHistory = item._paymentHistory || []
     return (
-      <div key={realIdx} className="bg-white rounded-lg p-4">
+      <div key={realIdx} className="bg-white rounded-2xl border border-[#F3F4F6] p-5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
             {item.logo_url ? (
               <img
                 src={item.logo_url}
                 alt={item.name}
-                className="w-8 h-8 rounded-full mt-1 flex-shrink-0"
+                className="w-9 h-9 rounded-xl mt-0.5 flex-shrink-0 object-cover"
                 onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
               />
             ) : null}
             <div
-              className="w-8 h-8 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-sm mt-1 flex-shrink-0"
+              className="w-9 h-9 rounded-xl bg-[#FFF5F0] text-[#F97316] flex items-center justify-center font-bold text-sm mt-0.5 flex-shrink-0"
               style={{ display: item.logo_url ? 'none' : 'flex' }}
             >
               {item.name?.charAt(0) || '?'}
@@ -252,7 +253,7 @@ const Dashboard = () => {
                 type="text"
                 value={item.name || ''}
                 onChange={(e) => handleEditReview(realIdx, 'name', e.target.value)}
-                className="font-medium text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-orange-400 focus:outline-none w-full text-sm"
+                className="font-semibold text-[#111827] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#F97316] focus:outline-none w-full text-sm"
               />
               <p className="text-xs text-gray-400 mt-0.5">
                 {item._emailCount} email{item._emailCount !== 1 ? 's' : ''} found · {item._domain}
@@ -319,13 +320,13 @@ const Dashboard = () => {
           <div className="flex gap-2 flex-shrink-0 mt-1">
             <button
               onClick={() => handleApproveReview(item)}
-              className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200"
+              className="px-4 py-1.5 bg-[#F97316] text-white rounded-full text-sm font-semibold hover:bg-[#EA580C] transition-colors"
             >
               Add
             </button>
             <button
               onClick={() => handleDismissReview(item)}
-              className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200"
+              className="px-4 py-1.5 bg-[#F9FAFB] text-[#6B7280] rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
             >
               Skip
             </button>
@@ -340,19 +341,19 @@ const Dashboard = () => {
     const realIdx = getRealIndex(item)
     const paymentHistory = item._paymentHistory || []
     return (
-      <div key={realIdx} className="bg-white rounded-lg p-3 opacity-80">
+      <div key={realIdx} className="bg-white rounded-xl border border-[#F3F4F6] p-4 opacity-80 hover:opacity-100 transition-all duration-200">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {item.logo_url ? (
               <img
                 src={item.logo_url}
                 alt={item.name}
-                className="w-7 h-7 rounded-full flex-shrink-0"
+                className="w-8 h-8 rounded-xl flex-shrink-0 object-cover"
                 onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
               />
             ) : null}
             <div
-              className="w-7 h-7 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center font-bold text-xs flex-shrink-0"
+              className="w-8 h-8 rounded-xl bg-[#F9FAFB] text-[#9CA3AF] flex items-center justify-center font-bold text-xs flex-shrink-0"
               style={{ display: item.logo_url ? 'none' : 'flex' }}
             >
               {item.name?.charAt(0) || '?'}
@@ -369,13 +370,13 @@ const Dashboard = () => {
           <div className="flex gap-2 flex-shrink-0">
             <button
               onClick={() => handleAddAsCancelled(item)}
-              className="px-3 py-1 bg-orange-100 text-orange-700 rounded-lg text-xs font-medium hover:bg-orange-200"
+              className="px-3 py-1.5 border-2 border-[#F97316] text-[#F97316] rounded-full text-xs font-semibold hover:bg-[#FFF5F0] transition-colors"
             >
               Track History
             </button>
             <button
               onClick={() => handleDismissReview(item)}
-              className="px-3 py-1 bg-gray-100 text-gray-500 rounded-lg text-xs font-medium hover:bg-gray-200"
+              className="px-3 py-1.5 bg-[#F9FAFB] text-[#9CA3AF] rounded-full text-xs font-medium hover:bg-gray-200 transition-colors"
             >
               Skip
             </button>
@@ -392,9 +393,9 @@ const Dashboard = () => {
       <div className={`${maxWidth} mx-auto mt-8 text-left`}>
         {/* Active subscriptions needing review */}
         {activeReviewItems.length > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 mb-4">
-            <h3 className="font-semibold text-orange-800 mb-1">Active subscriptions found — please confirm</h3>
-            <p className="text-xs text-orange-600 mb-3">You can edit name, amount, and billing cycle before adding.</p>
+          <div className="bg-[#FFF5F0] border border-[#F97316]/20 rounded-2xl p-6 mb-4">
+            <h3 className="font-bold text-[#111827] mb-1">Active subscriptions found — please confirm</h3>
+            <p className="text-xs text-[#6B7280] mb-4">You can edit name, amount, and billing cycle before adding.</p>
             <div className="space-y-3">
               {activeReviewItems.map(item => renderActiveReviewCard(item))}
             </div>
@@ -403,12 +404,12 @@ const Dashboard = () => {
 
         {/* Past subscriptions — collapsible */}
         {pastReviewItems.length > 0 && (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-2xl p-5">
             <button
               onClick={() => setShowPastItems(!showPastItems)}
               className="flex items-center justify-between w-full text-left"
             >
-              <span className="text-sm font-medium text-gray-600">
+              <span className="text-sm font-medium text-[#6B7280]">
                 We also found {pastReviewItems.length} past subscription{pastReviewItems.length !== 1 ? 's' : ''}
               </span>
               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showPastItems ? 'rotate-180' : ''}`} />
@@ -497,10 +498,10 @@ const Dashboard = () => {
 
   const getStatusBadge = (status) => {
     const styles = {
-      active: 'bg-green-100 text-green-700',
-      pending: 'bg-yellow-100 text-yellow-700',
-      paused: 'bg-orange-100 text-orange-700',
-      cancelled: 'bg-gray-100 text-gray-600',
+      active: 'bg-[#22C55E]/10 text-[#22C55E]',
+      pending: 'bg-[#FBBF24]/10 text-[#D97706]',
+      paused: 'bg-[#F97316]/10 text-[#F97316]',
+      cancelled: 'bg-[#F3F4F6] text-[#9CA3AF]',
     }
     const labels = {
       active: 'Active',
@@ -509,7 +510,7 @@ const Dashboard = () => {
       cancelled: 'Cancelled',
     }
     return (
-      <span className={`px-3 py-1 ${styles[status] || 'bg-gray-100 text-gray-600'} text-sm font-medium rounded-full`}>
+      <span className={`px-3 py-1 ${styles[status] || 'bg-[#F3F4F6] text-[#9CA3AF]'} text-xs font-semibold rounded-full`}>
         {labels[status] || status}
       </span>
     )
@@ -525,29 +526,29 @@ const Dashboard = () => {
   // ─── EMPTY STATE ───
   if (!loadingData && subscriptions.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600 mt-1">Your subscription overview at a glance.</p>
+      <div className="min-h-screen bg-white">
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-[#E5E7EB]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+            <h1 className="text-2xl font-bold text-[#111827]">Dashboard</h1>
+            <p className="text-[#6B7280] text-sm mt-0.5">Your subscription overview at a glance.</p>
           </div>
         </header>
 
         <main className="max-w-2xl mx-auto px-4 py-20 text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-orange-50 flex items-center justify-center">
-            <Inbox size={36} className="text-[#F97316]" />
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-[#FFF5F0] flex items-center justify-center">
+            <Scissors size={36} className="text-[#F97316]" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">No subscriptions yet</h2>
-          <p className="text-gray-500 mb-8 max-w-md mx-auto">
+          <h2 className="text-2xl font-bold text-[#111827] mb-3">No subscriptions yet</h2>
+          <p className="text-[#6B7280] mb-8 max-w-md mx-auto text-sm">
             Start by scanning your inbox to automatically find subscriptions, or add one manually.
           </p>
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-4">
             <div className="flex gap-3 items-center">
               <select
                 value={scanMonths}
                 onChange={(e) => setScanMonths(Number(e.target.value))}
                 disabled={scanning}
-                className="px-3 py-3 border border-gray-300 rounded-xl text-sm font-medium text-gray-700"
+                className="px-3 py-3 border border-[#E5E7EB] rounded-full text-sm font-medium text-[#111827] bg-[#F9FAFB]"
               >
                 <option value={6}>6 months</option>
                 <option value={12}>12 months</option>
@@ -557,30 +558,30 @@ const Dashboard = () => {
               <button
                 onClick={handleScanInbox}
                 disabled={scanning}
-                className="px-6 py-3 bg-[#F97316] text-white rounded-xl font-semibold hover:bg-[#EA580C] transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="px-7 py-3 bg-[#F97316] text-white rounded-full font-semibold hover:bg-[#EA580C] transition-all duration-200 flex items-center gap-2 disabled:opacity-50 shadow-[0_8px_28px_rgba(249,115,22,0.4)] hover:shadow-[0_12px_36px_rgba(249,115,22,0.5)]"
               >
                 {scanning ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />}
                 {scanning ? 'Scanning...' : 'Scan Inbox'}
               </button>
               <Link
                 to="/subscriptions?add=1"
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center gap-2"
+                className="px-7 py-3 border-2 border-[#F97316] text-[#F97316] rounded-full font-semibold hover:bg-[#FFF5F0] transition-colors flex items-center gap-2"
               >
                 <Plus size={18} />
                 Add Manually
               </Link>
             </div>
             {scanning && (
-              <div className="text-sm text-gray-600 text-center">
-                <p className="font-medium">Phase {scanProgress.phase}/4</p>
+              <div className="text-sm text-[#6B7280] text-center">
+                <p className="font-semibold text-[#111827]">Phase {scanProgress.phase}/4</p>
                 <p>{scanProgress.message}</p>
               </div>
             )}
             {scanResult?.error && (
-              <p className="text-sm text-red-500 max-w-md">{scanResult.error}</p>
+              <p className="text-sm text-[#EF4444] max-w-md">{scanResult.error}</p>
             )}
             {scanResult && !scanResult.error && (
-              <p className="text-sm text-green-600 flex items-center gap-1">
+              <p className="text-sm text-[#22C55E] flex items-center gap-1 font-medium">
                 <CheckCircle size={16} />
                 Added {scanResult.addedCount} new{scanResult.updatedCount > 0 ? `, updated ${scanResult.updatedCount} existing` : ''}.
                 {scanResult.reviewCount > 0 && ` ${scanResult.reviewCount} need your review.`}
@@ -598,41 +599,44 @@ const Dashboard = () => {
   // ─── LOADING STATE ───
   if (loadingData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-400">Loading your subscriptions...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="flex items-center gap-3 text-[#6B7280]">
+          <Loader2 size={20} className="animate-spin text-[#F97316]" />
+          <span className="text-sm font-medium">Loading your subscriptions...</span>
+        </div>
       </div>
     )
   }
 
   // ─── MAIN DASHBOARD ───
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex justify-between items-start">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-[#E5E7EB]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-2xl font-bold text-[#111827]">Dashboard</h1>
+            <p className="text-[#6B7280] text-sm mt-0.5">
               Your subscription overview at a glance.
             </p>
           </div>
-          <div className="flex gap-3">
-            <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium">
+          <div className="flex gap-2 items-center">
+            <button className="px-4 py-2 border-2 border-[#E5E7EB] rounded-full text-[#6B7280] hover:bg-[#F9FAFB] transition-colors flex items-center gap-2 text-sm font-medium">
               <Download className="w-4 h-4" />
-              Export CSV
+              Export
             </button>
             <Link
               to="/subscriptions?add=1"
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium"
+              className="px-4 py-2 border-2 border-[#E5E7EB] rounded-full text-[#6B7280] hover:bg-[#F9FAFB] transition-colors flex items-center gap-2 text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
-              Add Manually
+              Add
             </Link>
             <select
               value={scanMonths}
               onChange={(e) => setScanMonths(Number(e.target.value))}
               disabled={scanning}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700"
+              className="px-3 py-2 border-2 border-[#E5E7EB] rounded-full text-sm font-medium text-[#111827] bg-white"
             >
               <option value={6}>6 mo</option>
               <option value={12}>12 mo</option>
@@ -642,7 +646,7 @@ const Dashboard = () => {
             <button
               onClick={handleScanInbox}
               disabled={scanning}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 font-medium disabled:opacity-50"
+              className="px-5 py-2 bg-[#F97316] text-white rounded-full hover:bg-[#EA580C] transition-all duration-200 flex items-center gap-2 text-sm font-semibold disabled:opacity-50 shadow-[0_4px_16px_rgba(249,115,22,0.3)]"
             >
               {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
               {scanning ? 'Scanning...' : 'Scan Inbox'}
@@ -654,18 +658,18 @@ const Dashboard = () => {
       {/* Scanning Progress Banner */}
       {scanning && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-          <div className="rounded-xl p-4 bg-blue-50 border border-blue-200">
+          <div className="rounded-2xl p-5 bg-[#FFF5F0] border border-[#F97316]/20">
             <div className="flex items-center gap-3">
-              <Loader2 size={18} className="animate-spin text-blue-600" />
+              <Loader2 size={18} className="animate-spin text-[#F97316]" />
               <div>
-                <p className="text-sm font-medium text-blue-700">Phase {scanProgress.phase}/4</p>
-                <p className="text-sm text-blue-600">{scanProgress.message}</p>
+                <p className="text-sm font-semibold text-[#111827]">Phase {scanProgress.phase}/4</p>
+                <p className="text-sm text-[#6B7280]">{scanProgress.message}</p>
               </div>
             </div>
             {scanProgress.total > 0 && (
-              <div className="mt-2 bg-blue-100 rounded-full h-2">
+              <div className="mt-3 bg-[#F97316]/10 rounded-full h-2">
                 <div
-                  className="bg-blue-500 rounded-full h-2 transition-all duration-300"
+                  className="bg-[#F97316] rounded-full h-2 transition-all duration-300"
                   style={{ width: `${Math.min(100, (scanProgress.current / scanProgress.total) * 100)}%` }}
                 />
               </div>
@@ -677,11 +681,11 @@ const Dashboard = () => {
       {/* Scan Result Banner */}
       {scanResult && !scanning && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-          <div className={`rounded-xl p-4 flex items-center justify-between ${
-            scanResult.error ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'
+          <div className={`rounded-2xl p-4 flex items-center justify-between ${
+            scanResult.error ? 'bg-red-50 border border-[#EF4444]/20' : 'bg-green-50 border border-[#22C55E]/20'
           }`}>
             <p className={`text-sm font-medium flex items-center gap-2 ${
-              scanResult.error ? 'text-red-700' : 'text-green-700'
+              scanResult.error ? 'text-[#EF4444]' : 'text-[#22C55E]'
             }`}>
               {scanResult.error ? (
                 scanResult.error
@@ -706,25 +710,25 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Cost View Toggle */}
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-sm text-gray-500">View as:</span>
-          <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex items-center gap-3 mb-6">
+          <span className="text-sm text-[#9CA3AF]">View as:</span>
+          <div className="inline-flex rounded-full border border-[#E5E7EB] overflow-hidden p-0.5 bg-[#F9FAFB]">
             <button
               onClick={() => setCostView('monthly')}
-              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-all duration-200 ${
                 costView === 'monthly'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'bg-[#111827] text-white shadow-sm'
+                  : 'text-[#6B7280] hover:text-[#111827]'
               }`}
             >
               Monthly
             </button>
             <button
               onClick={() => setCostView('yearly')}
-              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-all duration-200 ${
                 costView === 'yearly'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'bg-[#111827] text-white shadow-sm'
+                  : 'text-[#6B7280] hover:text-[#111827]'
               }`}
             >
               Yearly
@@ -733,73 +737,73 @@ const Dashboard = () => {
         </div>
 
         {/* Stats Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+          <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-gray-600 text-sm font-medium">
+                <p className="text-[#6B7280] text-xs font-semibold uppercase tracking-wider">
                   Total {costView === 'monthly' ? 'Monthly' : 'Yearly'} Cost
                 </p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">${displayTotal.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-[#111827] mt-2">${displayTotal.toFixed(2)}</p>
                 {costView === 'monthly' && (yearlySubs.length > 0 || quarterSubs.length > 0) && (
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-[#9CA3AF] mt-1">
                     Includes {yearlySubs.length > 0 ? `${yearlySubs.length} yearly` : ''}{yearlySubs.length > 0 && quarterSubs.length > 0 ? ', ' : ''}{quarterSubs.length > 0 ? `${quarterSubs.length} quarterly` : ''} (prorated)
                   </p>
                 )}
                 {costView === 'yearly' && (
-                  <p className="text-xs text-gray-400 mt-1">All subscriptions annualized</p>
+                  <p className="text-xs text-[#9CA3AF] mt-1">All subscriptions annualized</p>
                 )}
               </div>
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-blue-600" />
+              <div className="w-11 h-11 rounded-2xl bg-[#FFF5F0] flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-[#F97316]" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Active Subscriptions</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{activeCount}</p>
+                <p className="text-[#6B7280] text-xs font-semibold uppercase tracking-wider">Active Subscriptions</p>
+                <p className="text-3xl font-bold text-[#111827] mt-2">{activeCount}</p>
               </div>
-              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                <Package className="w-6 h-6 text-purple-600" />
+              <div className="w-11 h-11 rounded-2xl bg-[#FFF5F0] flex items-center justify-center">
+                <Package className="w-5 h-5 text-[#F97316]" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Renewing Soon</p>
-                <p className="text-3xl font-bold text-orange-500 mt-2">{upcoming.length}</p>
+                <p className="text-[#6B7280] text-xs font-semibold uppercase tracking-wider">Renewing Soon</p>
+                <p className="text-3xl font-bold text-[#F97316] mt-2">{upcoming.length}</p>
               </div>
-              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
-                <Clock className="w-6 h-6 text-orange-500" />
+              <div className="w-11 h-11 rounded-2xl bg-[#FFF5F0] flex items-center justify-center">
+                <Clock className="w-5 h-5 text-[#F97316]" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-gray-600 text-sm font-medium">
+                <p className="text-[#6B7280] text-xs font-semibold uppercase tracking-wider">
                   Saved ({costView === 'monthly' ? '/mo' : '/yr'})
                 </p>
-                <p className="text-3xl font-bold text-green-600 mt-2">${cancelledSavings.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-[#22C55E] mt-2">${cancelledSavings.toFixed(2)}</p>
                 {cancelledSavings > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">From cancelled subscriptions</p>
+                  <p className="text-xs text-[#9CA3AF] mt-1">From cancelled subscriptions</p>
                 )}
               </div>
-              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                <TrendingDown className="w-6 h-6 text-green-600" />
+              <div className="w-11 h-11 rounded-2xl bg-green-50 flex items-center justify-center">
+                <TrendingDown className="w-5 h-5 text-[#22C55E]" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Filter Bar */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 flex justify-between items-center flex-wrap gap-4">
+        <div className="bg-[#F9FAFB] rounded-2xl p-4 mb-6 flex justify-between items-center flex-wrap gap-4">
           <div className="flex gap-2 flex-wrap">
             {[
               { key: 'all', label: 'All', count: counts.all },
@@ -811,10 +815,10 @@ const Dashboard = () => {
               <button
                 key={filter.key}
                 onClick={() => setActiveFilter(filter.key)}
-                className={`px-4 py-2 rounded-full font-medium text-sm transition-colors ${
+                className={`px-4 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
                   activeFilter === filter.key
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-[#111827] text-white shadow-sm'
+                    : 'bg-white text-[#6B7280] hover:text-[#111827] border border-[#E5E7EB]'
                 }`}
               >
                 {filter.label} ({filter.count})
@@ -826,13 +830,13 @@ const Dashboard = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-2 bg-gray-100 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 cursor-pointer appearance-none pr-8 hover:bg-gray-200 transition-colors"
+              className="px-4 py-2 bg-white rounded-full border border-[#E5E7EB] text-sm font-medium text-[#111827] cursor-pointer appearance-none pr-8 hover:border-[#F97316] transition-colors"
             >
               <option value="renewal">Sort: Renewal Date</option>
               <option value="price">Sort: Price (High to Low)</option>
               <option value="name">Sort: Name (A-Z)</option>
             </select>
-            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 pointer-events-none" />
+            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-[#9CA3AF] pointer-events-none" />
           </div>
         </div>
 
@@ -854,8 +858,8 @@ const Dashboard = () => {
                   key={sub.id}
                   onMouseEnter={() => setHoveredId(sub.id)}
                   onMouseLeave={() => setHoveredId(null)}
-                  className={`bg-white rounded-xl border border-gray-200 p-5 flex justify-between items-center transition-all ${
-                    sub.status === 'cancelled' ? 'opacity-60' : ''
+                  className={`bg-white rounded-2xl border border-[#F3F4F6] p-5 flex justify-between items-center transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 ${
+                    sub.status === 'cancelled' ? 'opacity-55' : ''
                   }`}
                 >
                   <div className="flex items-center gap-4 flex-1">
@@ -863,28 +867,28 @@ const Dashboard = () => {
                       <img
                         src={sub.logo_url}
                         alt={sub.name}
-                        className="w-12 h-12 rounded-full object-cover"
+                        className="w-11 h-11 rounded-2xl object-cover"
                         onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
                       />
                     ) : null}
                     <div
-                      className="w-12 h-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-lg flex-shrink-0"
+                      className="w-11 h-11 rounded-2xl bg-[#FFF5F0] text-[#F97316] flex items-center justify-center font-bold text-lg flex-shrink-0"
                       style={{ display: sub.logo_url ? 'none' : 'flex' }}
                     >
                       {getInitial(sub.name)}
                     </div>
                     <div>
-                      <p className={`font-semibold text-gray-900 ${sub.status === 'cancelled' ? 'line-through text-gray-500' : ''}`}>
+                      <p className={`font-semibold text-[#111827] ${sub.status === 'cancelled' ? 'line-through text-[#9CA3AF]' : ''}`}>
                         {sub.name}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${catInfo.color} ${catInfo.textColor}`}>
                           {catInfo.label}
                         </span>
-                        <span className="text-xs text-gray-400 capitalize">{sub.billing_cycle || 'unknown'}</span>
+                        <span className="text-xs text-[#9CA3AF] capitalize">{sub.billing_cycle || 'unknown'}</span>
                       </div>
                       {sub.last_email_date && (
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-xs text-[#9CA3AF] mt-0.5">
                           Last billed: {new Date(sub.last_email_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
                       )}
@@ -894,34 +898,34 @@ const Dashboard = () => {
                   <div className="flex items-center gap-6">
                     {sub.status !== 'cancelled' && (
                       <div className="text-right">
-                        <p className="text-sm text-gray-600">Renews</p>
-                        <p className="font-semibold text-gray-900">{formatDate(sub.next_billing_date)}</p>
+                        <p className="text-xs text-[#9CA3AF] font-medium">Renews</p>
+                        <p className="font-semibold text-[#111827] text-sm">{formatDate(sub.next_billing_date)}</p>
                       </div>
                     )}
                     {sub.status === 'cancelled' && (
                       <div className="text-right">
-                        <p className="text-sm text-gray-400">Cancelled</p>
+                        <p className="text-xs text-[#9CA3AF]">Cancelled</p>
                       </div>
                     )}
 
                     <div className="text-right min-w-24">
-                      <p className="text-sm text-gray-600">Price</p>
+                      <p className="text-xs text-[#9CA3AF] font-medium">Price</p>
                       {Number(sub.amount) > 0 ? (
                         <>
-                          <p className="font-semibold text-gray-900">
+                          <p className="font-semibold text-[#111827] text-sm">
                             {currPrefix}{Number(sub.amount).toFixed(2)}
-                            <span className="text-xs text-gray-400 font-normal">
+                            <span className="text-xs text-[#9CA3AF] font-normal">
                               /{sub.billing_cycle === 'yearly' ? 'yr' : sub.billing_cycle === 'quarterly' ? 'qtr' : sub.billing_cycle === 'weekly' ? 'wk' : 'mo'}
                             </span>
                           </p>
                           {showEquiv && (
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-[#9CA3AF]">
                               ≈ {currPrefix}{(costView === 'monthly' ? equivMonthly : equivYearly).toFixed(2)}/{costView === 'monthly' ? 'mo' : 'yr'}
                             </p>
                           )}
                         </>
                       ) : (
-                        <p className="font-semibold text-gray-400">—</p>
+                        <p className="font-semibold text-[#D1D5DB]">—</p>
                       )}
                     </div>
 
@@ -930,7 +934,7 @@ const Dashboard = () => {
                       {hoveredId === sub.id && sub.status === 'active' && (
                         <button
                           onClick={() => setCancelConfirm(sub)}
-                          className="text-xs text-red-400 hover:text-red-600 transition-colors whitespace-nowrap"
+                          className="text-xs text-[#EF4444]/70 hover:text-[#EF4444] transition-colors whitespace-nowrap font-medium"
                         >
                           Cancel
                         </button>
@@ -939,13 +943,13 @@ const Dashboard = () => {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleReactivateSub(sub)}
-                            className="text-xs text-green-500 hover:text-green-700 transition-colors"
+                            className="text-xs text-[#22C55E] hover:text-green-700 transition-colors font-medium"
                           >
                             Reactivate
                           </button>
                           <button
                             onClick={() => setDeleteConfirm(sub)}
-                            className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                            className="text-xs text-[#EF4444]/70 hover:text-[#EF4444] transition-colors font-medium"
                           >
                             Delete
                           </button>
@@ -957,8 +961,8 @@ const Dashboard = () => {
               )
             })
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-              <p className="text-gray-600 font-medium">No subscriptions match this filter.</p>
+            <div className="bg-[#F9FAFB] rounded-2xl p-12 text-center">
+              <p className="text-[#6B7280] font-medium">No subscriptions match this filter.</p>
             </div>
           )}
         </div>
@@ -967,21 +971,21 @@ const Dashboard = () => {
       {/* Cancel Confirmation Modal */}
       {cancelConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Cancel Subscription?</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Mark <strong>{cancelConfirm.name}</strong> as cancelled? You can reactivate it later.
+          <div className="bg-white rounded-3xl shadow-[0_16px_48px_-12px_rgba(0,0,0,0.25)] w-full max-w-sm mx-4 p-7">
+            <h3 className="text-lg font-bold text-[#111827] mb-2">Cancel Subscription?</h3>
+            <p className="text-sm text-[#6B7280] mb-5">
+              Mark <strong className="text-[#111827]">{cancelConfirm.name}</strong> as cancelled? You can reactivate it later.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setCancelConfirm(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                className="px-5 py-2.5 text-sm font-semibold text-[#6B7280] bg-[#F9FAFB] rounded-full hover:bg-[#F3F4F6] transition-colors"
               >
                 Keep Active
               </button>
               <button
                 onClick={() => handleCancelSub(cancelConfirm)}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600"
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-[#EF4444] rounded-full hover:bg-red-600 transition-colors"
               >
                 Yes, Cancel
               </button>
@@ -993,21 +997,21 @@ const Dashboard = () => {
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Permanently?</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Permanently delete <strong>{deleteConfirm.name}</strong>? This cannot be undone.
+          <div className="bg-white rounded-3xl shadow-[0_16px_48px_-12px_rgba(0,0,0,0.25)] w-full max-w-sm mx-4 p-7">
+            <h3 className="text-lg font-bold text-[#111827] mb-2">Delete Permanently?</h3>
+            <p className="text-sm text-[#6B7280] mb-5">
+              Permanently delete <strong className="text-[#111827]">{deleteConfirm.name}</strong>? This cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                className="px-5 py-2.5 text-sm font-semibold text-[#6B7280] bg-[#F9FAFB] rounded-full hover:bg-[#F3F4F6] transition-colors"
               >
                 Keep
               </button>
               <button
                 onClick={() => handleDeleteSub(deleteConfirm)}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600"
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-[#EF4444] rounded-full hover:bg-red-600 transition-colors"
               >
                 Delete Forever
               </button>

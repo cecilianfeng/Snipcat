@@ -35,26 +35,31 @@ function verifyWebhookSignature(payload: string, signature: string): any {
   });
 }
 
-// Simpler approach: use Deno's built-in crypto for HMAC
+// Verify Stripe webhook using correct signed payload format
 async function verifyStripeSignature(
   payload: string,
   signature: string
 ): Promise<boolean> {
-  // Parse the signature header: t=timestamp,v1=hash
-  const parts = signature.split(",");
-  const signedContent = parts
-    .filter((part) => part.startsWith("v1="))
-    .map((part) => part.slice(3))[0];
+  // Parse the signature header: t=timestamp,v1=hash[,v1=hash...]
+  const elements = signature.split(",");
+  const timestampStr = elements
+    .find((e) => e.startsWith("t="))
+    ?.slice(2);
+  const signatures = elements
+    .filter((e) => e.startsWith("v1="))
+    .map((e) => e.slice(3));
 
-  if (!signedContent) {
-    console.error("No v1 signature found");
+  if (!timestampStr || signatures.length === 0) {
+    console.error("No timestamp or v1 signature found");
     return false;
   }
 
-  // Compute HMAC-SHA256
+  // Stripe signs: "timestamp.payload" (not just payload)
+  const signedPayload = `${timestampStr}.${payload}`;
+
   const encoder = new TextEncoder();
   const keyData = encoder.encode(STRIPE_WEBHOOK_SECRET);
-  const messageData = encoder.encode(payload);
+  const messageData = encoder.encode(signedPayload);
 
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
@@ -74,7 +79,8 @@ async function verifyStripeSignature(
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  return computedHex === signedContent;
+  // Check against all v1 signatures (Stripe may send multiple)
+  return signatures.some((sig) => computedHex === sig);
 }
 
 serve(async (req: Request) => {

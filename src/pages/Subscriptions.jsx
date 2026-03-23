@@ -528,14 +528,14 @@ export default function Subscriptions() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-transparent flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="text-gray-400 dark:text-gray-500">Loading subscriptions...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-transparent">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <SubscriptionModal
         isOpen={modalOpen}
         onClose={() => { setModalOpen(false); setEditingSub(null) }}

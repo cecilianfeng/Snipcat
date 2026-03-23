@@ -125,7 +125,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-transparent">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Sticky Header */}
       <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#1C1F2E]/80 backdrop-blur-sm border-b border-gray-200 dark:border-[#2A2D3A]">
         <div className="max-w-3xl mx-auto px-6 py-8">

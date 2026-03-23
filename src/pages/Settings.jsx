@@ -227,8 +227,22 @@ export default function Settings() {
               </div>
             </div>
 
+            {/* Connect another Gmail — coming soon */}
+            <div className="p-4 rounded-xl border border-dashed border-[#E5E7EB] dark:border-[#2A2D3A] bg-[#F9FAFB] dark:bg-[#252836] opacity-60">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Mail className="text-gray-400" size={24} />
+                  <div>
+                    <h3 className="font-semibold text-[#111827] dark:text-white">Connect another Gmail</h3>
+                    <p className="text-sm text-[#9CA3AF] dark:text-gray-500">Coming soon</p>
+                  </div>
+                </div>
+                <span className="text-xs font-medium text-[#9CA3AF] dark:text-gray-500 bg-[#F3F4F6] dark:bg-[#2A2D3A] px-3 py-1 rounded-full">Coming Soon</span>
+              </div>
+            </div>
+
             {/* Outlook — coming soon */}
-            <div className="p-4 rounded-xl border border-[#E5E7EB] dark:border-[#2A2D3A] bg-[#F9FAFB] dark:bg-[#252836]">
+            <div className="p-4 rounded-xl border border-dashed border-[#E5E7EB] dark:border-[#2A2D3A] bg-[#F9FAFB] dark:bg-[#252836] opacity-60">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-6 h-6 rounded bg-blue-500" />
@@ -237,12 +251,12 @@ export default function Settings() {
                     <p className="text-sm text-[#9CA3AF] dark:text-gray-500">Coming soon</p>
                   </div>
                 </div>
-                <span className="text-xs font-medium text-[#9CA3AF] dark:text-gray-500 bg-[#F3F4F6] dark:bg-[#2A2D3A] px-3 py-1 rounded-full">Soon</span>
+                <span className="text-xs font-medium text-[#9CA3AF] dark:text-gray-500 bg-[#F3F4F6] dark:bg-[#2A2D3A] px-3 py-1 rounded-full">Coming Soon</span>
               </div>
             </div>
 
             {/* Apple Mail — coming soon */}
-            <div className="p-4 rounded-xl border border-[#E5E7EB] dark:border-[#2A2D3A] bg-[#F9FAFB] dark:bg-[#252836]">
+            <div className="p-4 rounded-xl border border-dashed border-[#E5E7EB] dark:border-[#2A2D3A] bg-[#F9FAFB] dark:bg-[#252836] opacity-60">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-6 h-6 rounded bg-gray-800 dark:bg-gray-600" />
@@ -251,7 +265,7 @@ export default function Settings() {
                     <p className="text-sm text-[#9CA3AF] dark:text-gray-500">Coming soon</p>
                   </div>
                 </div>
-                <span className="text-xs font-medium text-[#9CA3AF] dark:text-gray-500 bg-[#F3F4F6] dark:bg-[#2A2D3A] px-3 py-1 rounded-full">Soon</span>
+                <span className="text-xs font-medium text-[#9CA3AF] dark:text-gray-500 bg-[#F3F4F6] dark:bg-[#2A2D3A] px-3 py-1 rounded-full">Coming Soon</span>
               </div>
             </div>
           </div>

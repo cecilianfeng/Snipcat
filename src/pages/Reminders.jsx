@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Bell, Plus, AlertTriangle, Inbox } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getSubscriptions, getUpcomingRenewals, getMonthlyEquivalent, getYearlyEquivalent } from '../lib/subscriptions'
+import { upsertNotificationPrefs, RENEWAL_DAYS_OPTIONS, DIGEST_DAY_OPTIONS } from '../lib/notifications'
 
 const Toggle = ({ enabled, onChange }) => (
   <div
@@ -86,8 +87,50 @@ const Reminders = () => {
     return convertToDominant(monthly, sub.currency || 'USD')
   }
 
-  const togglePref = (key) => setPrefs(prev => ({ ...prev, [key]: !prev[key] }))
-  const updateDropdown = (key, value) => setPrefs(prev => ({ ...prev, [key]: value }))
+  const togglePref = async (key) => {
+    const newVal = !prefs[key]
+    setPrefs(prev => ({ ...prev, [key]: newVal }))
+
+    // Map UI keys to DB field names
+    const fieldMap = {
+      renewalReminder: 'renewal_reminders_enabled',
+      priceChange: 'price_change_alerts_enabled',
+      trialWarning: 'free_trial_warnings_enabled',
+      weeklyDigest: 'weekly_digest_enabled',
+      emailNotif: 'email_notifications_enabled',
+    }
+
+    try {
+      await upsertNotificationPrefs(user.id, { [fieldMap[key]]: newVal })
+    } catch (err) {
+      console.error(`Failed to save preference ${key}:`, err)
+    }
+  }
+
+  const updateDropdown = async (key, value) => {
+    setPrefs(prev => ({ ...prev, [key]: value }))
+
+    // Map UI values to DB values
+    let dbValue = value
+    if (key === 'renewalDays') {
+      const option = RENEWAL_DAYS_OPTIONS.find(o => o.label === value)
+      dbValue = option?.value || 3
+    } else if (key === 'digestDay') {
+      const option = DIGEST_DAY_OPTIONS.find(o => o.label === value)
+      dbValue = option?.value || 'monday'
+    }
+
+    const fieldMap = {
+      renewalDays: 'renewal_days_before',
+      digestDay: 'weekly_digest_day',
+    }
+
+    try {
+      await upsertNotificationPrefs(user.id, { [fieldMap[key]]: dbValue })
+    } catch (err) {
+      console.error(`Failed to save preference ${key}:`, err)
+    }
+  }
 
   // Group upcoming renewals by timeframe
   const today = new Date()

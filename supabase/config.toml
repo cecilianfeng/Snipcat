@@ -1,5 +1,5 @@
-[project]
-id = ""
+[api]
+enabled = true
 
 [functions.send-renewal-reminders]
 verify_jwt = false

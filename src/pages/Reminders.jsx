@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Bell, Plus, AlertTriangle, Inbox } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { getSubscriptions, getUpcomingRenewals } from '../lib/subscriptions'
+import { getSubscriptions, getUpcomingRenewals, getMonthlyEquivalent, getYearlyEquivalent } from '../lib/subscriptions'
 
 const Toggle = ({ enabled, onChange }) => (
   <div
@@ -46,6 +46,44 @@ const Reminders = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  // ─── CURRENCY CONVERSION (same as Dashboard) ───
+  const RATES_TO_USD = {
+    USD: 1, CAD: 0.74, CNY: 0.14, EUR: 1.09, GBP: 1.27, AUD: 0.66,
+    JPY: 0.0067, KRW: 0.00075, INR: 0.012, SGD: 0.75, HKD: 0.13,
+    TWD: 0.031, MYR: 0.22, CHF: 1.13, BRL: 0.20, SEK: 0.097,
+  }
+  const CURRENCY_SYMBOLS = {
+    USD: '$', CAD: 'CA$', CNY: '¥', EUR: '€', GBP: '£', AUD: 'A$',
+    JPY: '¥', KRW: '₩', INR: '₹', SGD: 'S$', HKD: 'HK$',
+    TWD: 'NT$', MYR: 'RM', CHF: 'CHF ', BRL: 'R$', SEK: 'kr ',
+  }
+  const getDominantCurrency = () => {
+    const counts = {}
+    subscriptions.filter(s => s.status === 'active' && s.amount > 0).forEach(s => {
+      const c = s.currency || 'USD'
+      counts[c] = (counts[c] || 0) + 1
+    })
+    let max = 0, dominant = 'USD'
+    for (const [c, n] of Object.entries(counts)) {
+      if (n > max) { max = n; dominant = c }
+    }
+    return dominant
+  }
+  const dominantCurrency = getDominantCurrency()
+  const dominantSymbol = CURRENCY_SYMBOLS[dominantCurrency] || dominantCurrency + ' '
+  const convertToDominant = (amount, fromCurrency) => {
+    if (!amount) return 0
+    const from = fromCurrency || 'USD'
+    if (from === dominantCurrency) return amount
+    const usdAmount = amount * (RATES_TO_USD[from] || 1)
+    const rate = RATES_TO_USD[dominantCurrency] || 1
+    return usdAmount / rate
+  }
+  const getMonthlyInDominant = (sub) => {
+    const monthly = getMonthlyEquivalent(sub)
+    return convertToDominant(monthly, sub.currency || 'USD')
   }
 
   const togglePref = (key) => setPrefs(prev => ({ ...prev, [key]: !prev[key] }))
@@ -117,7 +155,7 @@ const Reminders = () => {
                   <div
                     key={item.id}
                     className={`rounded-2xl p-5 border ${
-                      daysLeft <= 2 ? 'bg-[#EF4444]/[0.05] border-[#EF4444]/20' : 'bg-white border-[#E5E7EB] shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow'
+                      daysLeft <= 2 ? 'bg-[#EF4444]/[0.05] border-[#EF4444]/20' : 'bg-white border-[#F3F4F6] shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -132,7 +170,7 @@ const Reminders = () => {
                           </p>
                         </div>
                       </div>
-                      <p className="font-semibold text-[#111827] text-lg">${Number(item.amount).toFixed(2)}</p>
+                      <p className="font-semibold text-[#111827] text-lg">{dominantSymbol}{getMonthlyInDominant(item).toFixed(2)}/mo</p>
                     </div>
                   </div>
                 )
@@ -149,7 +187,7 @@ const Reminders = () => {
               {thisMonth.map(item => {
                 const daysLeft = getDaysLeft(item.next_billing_date)
                 return (
-                  <div key={item.id} className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow">
+                  <div key={item.id} className="bg-white rounded-2xl border border-[#F3F4F6] p-5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-11 h-11 rounded-full bg-[#FFF5F0] text-[#F97316] flex items-center justify-center font-semibold">
@@ -162,7 +200,7 @@ const Reminders = () => {
                           </p>
                         </div>
                       </div>
-                      <p className="font-bold text-[#111827]">${Number(item.amount).toFixed(2)}</p>
+                      <p className="font-bold text-[#111827]">{dominantSymbol}{getMonthlyInDominant(item).toFixed(2)}/mo</p>
                     </div>
                   </div>
                 )

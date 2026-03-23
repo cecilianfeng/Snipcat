@@ -9,6 +9,8 @@ import {
   deleteSubscription,
   CATEGORIES,
   groupByCategory,
+  getMonthlyEquivalent,
+  getYearlyEquivalent,
 } from '../lib/subscriptions'
 
 // ─── ADD / EDIT MODAL ───
@@ -252,6 +254,48 @@ export default function Subscriptions() {
     }
   }
 
+  // ─── CURRENCY CONVERSION (same as Dashboard) ───
+  const RATES_TO_USD = {
+    USD: 1, CAD: 0.74, CNY: 0.14, EUR: 1.09, GBP: 1.27, AUD: 0.66,
+    JPY: 0.0067, KRW: 0.00075, INR: 0.012, SGD: 0.75, HKD: 0.13,
+    TWD: 0.031, MYR: 0.22, CHF: 1.13, BRL: 0.20, SEK: 0.097,
+  }
+  const CURRENCY_SYMBOLS = {
+    USD: '$', CAD: 'CA$', CNY: '¥', EUR: '€', GBP: '£', AUD: 'A$',
+    JPY: '¥', KRW: '₩', INR: '₹', SGD: 'S$', HKD: 'HK$',
+    TWD: 'NT$', MYR: 'RM', CHF: 'CHF ', BRL: 'R$', SEK: 'kr ',
+  }
+  const getDominantCurrency = () => {
+    const counts = {}
+    subscriptions.filter(s => s.status === 'active' && s.amount > 0).forEach(s => {
+      const c = s.currency || 'USD'
+      counts[c] = (counts[c] || 0) + 1
+    })
+    let max = 0, dominant = 'USD'
+    for (const [c, n] of Object.entries(counts)) {
+      if (n > max) { max = n; dominant = c }
+    }
+    return dominant
+  }
+  const dominantCurrency = getDominantCurrency()
+  const dominantSymbol = CURRENCY_SYMBOLS[dominantCurrency] || dominantCurrency + ' '
+  const convertToDominant = (amount, fromCurrency) => {
+    if (!amount) return 0
+    const from = fromCurrency || 'USD'
+    if (from === dominantCurrency) return amount
+    const usdAmount = amount * (RATES_TO_USD[from] || 1)
+    const rate = RATES_TO_USD[dominantCurrency] || 1
+    return usdAmount / rate
+  }
+  const getMonthlyInDominant = (sub) => {
+    const monthly = getMonthlyEquivalent(sub)
+    return convertToDominant(monthly, sub.currency || 'USD')
+  }
+  const getYearlyInDominant = (sub) => {
+    const yearly = getYearlyEquivalent(sub)
+    return convertToDominant(yearly, sub.currency || 'USD')
+  }
+
   const handleSave = async (formData) => {
     try {
       if (editingSub) {
@@ -345,7 +389,7 @@ export default function Subscriptions() {
         {categoryEntries.map(([catKey, items]) => {
           const catConfig = CATEGORIES[catKey] || CATEGORIES.other
           const sortedItems = getSortedItems(items)
-          const catTotal = items.filter(s => s.status === 'active').reduce((s, i) => s + Number(i.amount), 0)
+          const catTotal = items.filter(s => s.status === 'active').reduce((s, i) => s + getMonthlyInDominant(i), 0)
 
           return (
             <div key={catKey} className="space-y-4">
@@ -357,7 +401,7 @@ export default function Subscriptions() {
                   <h3 className="text-lg font-semibold text-[#111827]">{catConfig.label}</h3>
                   <p className="text-sm text-[#6B7280]">{items.length} subscription{items.length !== 1 ? 's' : ''}</p>
                 </div>
-                <p className="ml-4 text-sm font-semibold text-[#111827]">${catTotal.toFixed(2)}/mo</p>
+                <p className="ml-4 text-sm font-semibold text-[#111827]">{dominantSymbol}{catTotal.toFixed(2)}/mo</p>
               </div>
 
               <div className="space-y-2">
@@ -366,7 +410,7 @@ export default function Subscriptions() {
                   const isCancelled = item.status === 'cancelled'
 
                   return (
-                    <div key={item.id} className="border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow">
+                    <div key={item.id} className="border border-[#F3F4F6] rounded-2xl overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow">
                       <button
                         onClick={() => toggleExpanded(item.id)}
                         className={`w-full px-5 py-4 flex items-center gap-4 hover:bg-[#F9FAFB] transition-colors ${isCancelled ? 'opacity-50' : ''}`}
@@ -389,8 +433,9 @@ export default function Subscriptions() {
                           <p className="font-medium">{formatDate(item.next_billing_date)}</p>
                         </div>
                         <div className="text-right min-w-max">
-                          <p className="text-lg font-semibold text-[#111827]">{Number(item.amount) > 0 ? `$${Number(item.amount).toFixed(2)}` : '—'}</p>
-                          <p className="text-xs text-[#9CA3AF]">{item.billing_cycle}</p>
+                          <p className="text-lg font-semibold text-[#111827]">{Number(item.amount) > 0 ? `${dominantSymbol}${getMonthlyInDominant(item).toFixed(2)}` : '—'}</p>
+                          <p className="text-xs text-[#9CA3AF]">/mo</p>
+                          {Number(item.amount) > 0 && <p className="text-xs text-[#9CA3AF]">{dominantSymbol}{getYearlyInDominant(item).toFixed(2)}/yr{(item.currency || 'USD') !== dominantCurrency && ' *'}</p>}
                         </div>
                         <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
                           {item.status}
@@ -460,7 +505,7 @@ export default function Subscriptions() {
     return (
       <div className="space-y-2">
         {sortedAll.map(item => (
-          <div key={item.id} className={`bg-white border border-[#E5E7EB] rounded-2xl px-5 py-4 flex items-center gap-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow ${item.status === 'cancelled' ? 'opacity-50' : ''}`}>
+          <div key={item.id} className={`bg-white border border-[#F3F4F6] rounded-2xl px-5 py-4 flex items-center gap-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow ${item.status === 'cancelled' ? 'opacity-50' : ''}`}>
             {item.logo_url ? (
               <img src={item.logo_url} alt={item.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
             ) : (
@@ -473,7 +518,7 @@ export default function Subscriptions() {
               <p className="text-sm text-[#6B7280] capitalize">{CATEGORIES[item.category]?.label || 'Other'}</p>
             </div>
             <div className="text-sm text-[#6B7280]">{formatDate(item.next_billing_date)}</div>
-            <div className="font-semibold text-[#111827]">{Number(item.amount) > 0 ? `$${Number(item.amount).toFixed(2)}` : '—'}</div>
+            <div className="font-semibold text-[#111827]">{Number(item.amount) > 0 ? `${dominantSymbol}${getMonthlyInDominant(item).toFixed(2)}/mo` : '—'}</div>
             <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
               {item.status}
             </div>
@@ -487,19 +532,19 @@ export default function Subscriptions() {
   // ─── SPENDING VIEW ───
   const renderSpendingView = () => {
     const activeItems = subscriptions.filter(s => s.status === 'active')
-    const monthlyTotal = activeItems.reduce((sum, s) => sum + Number(s.amount), 0)
-    const yearlyEstimate = monthlyTotal * 12
+    const monthlyTotal = activeItems.reduce((sum, s) => sum + getMonthlyInDominant(s), 0)
+    const yearlyEstimate = activeItems.reduce((sum, s) => sum + getYearlyInDominant(s), 0)
 
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6">
             <p className="text-sm text-[#6B7280] mb-1">Monthly Total</p>
-            <p className="text-3xl font-bold text-[#111827]">${monthlyTotal.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-[#111827]">{dominantSymbol}{monthlyTotal.toFixed(2)}</p>
           </div>
           <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6">
             <p className="text-sm text-[#6B7280] mb-1">Yearly Estimate</p>
-            <p className="text-3xl font-bold text-[#111827]">${yearlyEstimate.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-[#111827]">{dominantSymbol}{yearlyEstimate.toFixed(2)}</p>
           </div>
         </div>
 
@@ -507,13 +552,13 @@ export default function Subscriptions() {
           <h3 className="text-lg font-semibold text-[#111827] mb-4">Spending by Category</h3>
           {Object.entries(groupByCategory(activeItems)).map(([catKey, items]) => {
             const catConfig = CATEGORIES[catKey] || CATEGORIES.other
-            const catTotal = items.reduce((s, i) => s + Number(i.amount), 0)
+            const catTotal = items.reduce((s, i) => s + getMonthlyInDominant(i), 0)
             const pct = monthlyTotal > 0 ? (catTotal / monthlyTotal) * 100 : 0
             return (
               <div key={catKey} className="mb-4">
                 <div className="flex justify-between text-sm mb-1">
                   <span className="font-medium text-[#6B7280]">{catConfig.label}</span>
-                  <span className="text-[#6B7280]">${catTotal.toFixed(2)}/mo ({pct.toFixed(0)}%)</span>
+                  <span className="text-[#6B7280]">{dominantSymbol}{catTotal.toFixed(2)}/mo ({pct.toFixed(0)}%)</span>
                 </div>
                 <div className="h-2 bg-[#F3F4F6] rounded-full overflow-hidden">
                   <div className="h-full bg-[#F97316] rounded-full" style={{ width: `${pct}%` }} />

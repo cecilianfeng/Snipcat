@@ -62,11 +62,11 @@ export function AuthProvider({ children }) {
   }, [])
 
   // Google sign-in — request Gmail read scope so we can scan inbox later
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (redirectPath = '/dashboard') => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + '/dashboard',
+        redirectTo: window.location.origin + redirectPath,
         scopes: 'https://www.googleapis.com/auth/gmail.readonly',
       }
     })

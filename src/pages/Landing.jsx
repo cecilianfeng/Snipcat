@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, useScroll, useMotionValueEvent } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { createCheckoutSession } from '../lib/stripe'
+import { supabase } from '../lib/supabaseClient'
 import {
   Mail, ScanSearch, BellRing,
   Radar, LayoutDashboard, DollarSign, Shield, Zap,
@@ -309,7 +311,36 @@ export default function Landing() {
   const [scrolled, setScrolled] = useState(false)
   const { scrollY } = useScroll()
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const [upgrading, setUpgrading] = useState(false)
+
   useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 10))
+
+  const handleProUpgradeClick = async (e) => {
+    e.preventDefault()
+
+    if (!user) {
+      // Not logged in: redirect to login with upgrade redirect
+      navigate('/login?redirect=upgrade')
+      return
+    }
+
+    // Logged in: start checkout session
+    setUpgrading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      const checkoutUrl = await createCheckoutSession(user.id, session.access_token)
+      window.location.href = checkoutUrl
+    } catch (err) {
+      console.error('Upgrade error:', err)
+      setUpgrading(false)
+      alert('Failed to start upgrade. Please try again.')
+    }
+  }
 
   return (
     <div className="bg-white text-gray-900 overflow-x-hidden">
@@ -649,9 +680,13 @@ export default function Landing() {
                   ))}
                 </ul>
               </div>
-              <Link to={user ? "/settings" : "/login"} className="block text-center py-3 mt-8 rounded-full bg-gradient-to-r from-[#F97316] to-[#EA580C] text-white font-semibold hover:from-[#EA580C] hover:to-[#C2410C] transition-all">
-                Start Saving Now
-              </Link>
+              <button
+                onClick={handleProUpgradeClick}
+                disabled={upgrading}
+                className="block text-center w-full py-3 mt-8 rounded-full bg-gradient-to-r from-[#F97316] to-[#EA580C] text-white font-semibold hover:from-[#EA580C] hover:to-[#C2410C] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {upgrading ? 'Loading...' : 'Start Saving Now'}
+              </button>
             </motion.div>
           </div>
         </div>

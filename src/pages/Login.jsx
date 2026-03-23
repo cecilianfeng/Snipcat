@@ -1,11 +1,49 @@
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { createCheckoutSession } from '../lib/stripe'
+import { supabase } from '../lib/supabaseClient'
 
 function Login() {
   const { user, loading, signInWithGoogle } = useAuth()
+  const [searchParams] = useSearchParams()
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
-  // 如果已登录，直接跳转 Dashboard
+  // Handle redirect after login (e.g., from Pro upgrade flow)
+  useEffect(() => {
+    const handlePostLoginRedirect = async () => {
+      if (!loading && user) {
+        const redirectParam = searchParams.get('redirect')
+
+        if (redirectParam === 'upgrade') {
+          setIsRedirecting(true)
+          try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) {
+              throw new Error('Not authenticated')
+            }
+
+            const checkoutUrl = await createCheckoutSession(user.id, session.access_token)
+            window.location.href = checkoutUrl
+          } catch (err) {
+            console.error('Redirect to checkout error:', err)
+            setIsRedirecting(false)
+            // Fallback to dashboard on error
+            window.location.href = '/dashboard'
+          }
+        }
+      }
+    }
+
+    handlePostLoginRedirect()
+  }, [user, loading, searchParams])
+
+  // 如果已登录且没有redirect参数，直接跳转 Dashboard
   if (!loading && user) {
+    const redirectParam = searchParams.get('redirect')
+    if (redirectParam === 'upgrade' || isRedirecting) {
+      return null // Let the effect handle the redirect
+    }
     return <Navigate to="/dashboard" replace />
   }
 
@@ -23,7 +61,11 @@ function Login() {
           </h1>
           <button
             type="button"
-            onClick={signInWithGoogle}
+            onClick={() => {
+              const redirectParam = searchParams.get('redirect')
+              const redirectPath = redirectParam === 'upgrade' ? '/login?redirect=upgrade' : '/dashboard'
+              signInWithGoogle(redirectPath)
+            }}
             disabled={loading}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition disabled:opacity-50"
           >

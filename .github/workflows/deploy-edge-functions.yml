@@ -22,34 +22,22 @@ jobs:
           version: latest
 
       - name: Deploy send-renewal-reminders function
-        run: |
-          supabase functions deploy send-renewal-reminders \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
-            --no-verify
+        run: supabase functions deploy send-renewal-reminders --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy send-trial-warnings function
-        run: |
-          supabase functions deploy send-trial-warnings \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
-            --no-verify
+        run: supabase functions deploy send-trial-warnings --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy send-weekly-digest function
-        run: |
-          supabase functions deploy send-weekly-digest \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
-            --no-verify
+        run: supabase functions deploy send-weekly-digest --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy notify-price-change function
-        run: |
-          supabase functions deploy notify-price-change \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
-            --no-verify
+        run: supabase functions deploy notify-price-change --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 

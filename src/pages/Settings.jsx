@@ -19,13 +19,22 @@ export default function Settings() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const sessionId = params.get('session_id')
-    if (sessionId && profile?.plan === 'pro') {
+    if (sessionId) {
+      // Refresh profile to get updated plan from webhook
+      const checkPayment = async () => {
+        await refreshProfile()
+        // Small delay to allow webhook to process
+        setTimeout(async () => {
+          await refreshProfile()
+        }, 2000)
+      }
+      checkPayment()
       setSuccessMessage('Payment successful! You are now on the Pro plan.')
-      setTimeout(() => setSuccessMessage(null), 5000)
+      setTimeout(() => setSuccessMessage(null), 8000)
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname)
     }
-  }, [profile?.plan])
+  }, [])
 
   const handleUpgradeToPro = async () => {
     setUpgrading(true)

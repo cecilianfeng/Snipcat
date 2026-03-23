@@ -3,7 +3,7 @@ import { Home, Package, Bell, Settings, LogOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Sidebar() {
-  const { user, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
 
   const navItems = [
@@ -73,7 +73,7 @@ export default function Sidebar() {
           )}
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm truncate">{fullName}</p>
-            <p className="text-xs text-white/40">Free Plan</p>
+            <p className="text-xs text-white/40">{profile?.plan === 'pro' ? '✨ Pro Plan' : 'Free Plan'}</p>
           </div>
         </div>
         <button

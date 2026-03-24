@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Check, Mail, Info, AlertTriangle, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Check, Mail, Info, AlertTriangle, Loader2, Camera, MoreVertical } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -20,6 +20,7 @@ export default function Settings() {
   const [canceling, setCanceling] = useState(false)
   const [cancelError, setCancelError] = useState(null)
   const [canceledMessage, setCanceledMessage] = useState(null)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
 
   // Check for successful payment (session_id in URL)
   useEffect(() => {
@@ -125,6 +126,9 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState(fullName)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarError, setAvatarError] = useState(null)
+  const fileInputRef = useRef(null)
 
   // Data & Privacy section
   const [analyticsEnabled, setAnalyticsEnabled] = useState(profile?.analytics_enabled ?? true)
@@ -160,6 +164,54 @@ export default function Settings() {
       setAnalyticsEnabled(!newValue)
     } finally {
       setSavingAnalytics(false)
+    }
+  }
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('Please select an image file')
+      return
+    }
+
+    setUploadingAvatar(true)
+    setAvatarError(null)
+
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`
+      const { error: uploadError, data } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true })
+
+      if (uploadError) {
+        throw new Error(uploadError.message)
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName)
+
+      // Update profile with new avatar_url
+      await updateProfile(user.id, { avatar_url: publicUrl })
+
+      // Refresh profile to show new avatar
+      await refreshProfile()
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    } catch (err) {
+      console.error('Avatar upload failed:', err)
+      setAvatarError(err.message || 'Failed to upload avatar')
+    } finally {
+      setUploadingAvatar(false)
     }
   }
 
@@ -217,18 +269,37 @@ export default function Settings() {
 
           {/* Avatar and Basic Info */}
           <div className="flex items-start gap-6 mb-8">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={fullName}
-                className="w-20 h-20 rounded-full object-cover flex-shrink-0"
-                referrerPolicy="no-referrer"
+            <div className="relative group">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={fullName}
+                  className="w-20 h-20 rounded-full object-cover flex-shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-[#F97316] flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-2xl font-bold">{initials}</span>
+                </div>
+              )}
+              {/* Camera overlay on hover */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute inset-0 w-20 h-20 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center disabled:opacity-50 cursor-pointer"
+                title="Upload new avatar"
+              >
+                <Camera size={20} className="text-white" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                disabled={uploadingAvatar}
+                className="hidden"
               />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-[#F97316] flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-2xl font-bold">{initials}</span>
-              </div>
-            )}
+            </div>
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{fullName}</h3>
               <p className="text-gray-600 dark:text-gray-400">{email}</p>
@@ -237,6 +308,21 @@ export default function Settings() {
               </p>
             </div>
           </div>
+
+          {/* Avatar upload error */}
+          {avatarError && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg p-4 mb-6 flex items-start gap-3">
+              <AlertTriangle className="text-red-600 dark:text-red-400 flex-shrink-0" size={20} />
+              <p className="text-red-700 dark:text-red-300 text-sm">{avatarError}</p>
+            </div>
+          )}
+
+          {uploadingAvatar && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-4 mb-6 flex items-start gap-3">
+              <Loader2 className="text-blue-600 dark:text-blue-400 flex-shrink-0 animate-spin" size={20} />
+              <p className="text-blue-700 dark:text-blue-300 text-sm">Uploading avatar...</p>
+            </div>
+          )}
 
           {/* Profile Inputs */}
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -386,7 +472,7 @@ export default function Settings() {
               <div>
                 <h3 className="text-xl font-bold text-[#111827] dark:text-white capitalize">{profile?.plan || 'Free'} Plan</h3>
                 <p className="text-[#6B7280] dark:text-gray-400 text-sm mt-1">
-                  {profile?.plan === 'pro' ? '$4.99/month' : 'Free forever'}
+                  {profile?.plan === 'pro' ? '$7.99/month' : 'Free forever'}
                 </p>
               </div>
               <span className="bg-[#22C55E]/10 text-[#22C55E] text-xs font-semibold px-3 py-1 rounded-full">
@@ -427,15 +513,43 @@ export default function Settings() {
                 </div>
               )}
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-4 mb-4">
-                <p className="text-blue-900 dark:text-blue-300 font-medium">You are on the Pro plan</p>
-                <p className="text-blue-700 dark:text-blue-400 text-sm mt-1">Thank you for your subscription! Manage your billing in Stripe.</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-900 dark:text-blue-300 font-medium">You are on the Pro plan</p>
+                    <p className="text-blue-700 dark:text-blue-400 text-sm mt-1">Thank you for your subscription! Manage your billing in Stripe.</p>
+                  </div>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowMoreMenu(!showMoreMenu)}
+                      className="p-2 rounded-lg hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors flex-shrink-0"
+                      title="More options"
+                    >
+                      <MoreVertical size={20} className="text-blue-600 dark:text-blue-400" />
+                    </button>
+                    {showMoreMenu && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#1C1F2E] rounded-xl shadow-lg border border-[#E5E7EB] dark:border-[#2A2D3A] py-1 z-50">
+                        <button
+                          onClick={() => {
+                            setShowMoreMenu(false)
+                            setShowCancelModal(true)
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                          Cancel Subscription
+                        </button>
+                        <a
+                          href="https://billing.stripe.com/p/login/dummystripe"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block px-4 py-2.5 text-sm font-medium text-[#6B7280] dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252836] transition-colors"
+                        >
+                          View Invoice History
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={() => setShowCancelModal(true)}
-                className="w-full py-3.5 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-base"
-              >
-                Cancel Subscription
-              </button>
             </>
           )}
         </div>

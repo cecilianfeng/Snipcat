@@ -594,9 +594,9 @@ const Dashboard = () => {
   const handleSaveSubscription = async (formData) => {
     try {
       if (editingSub) {
-        await updateSubscription(user.id, editingSub.id, formData)
+        await updateSubscription(editingSub.id, formData)
       } else {
-        await createSubscription(user.id, formData)
+        await createSubscription({ ...formData, user_id: user.id })
       }
       await loadSubscriptions()
       setModalOpen(false)

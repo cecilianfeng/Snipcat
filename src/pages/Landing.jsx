@@ -671,7 +671,7 @@ export default function Landing() {
                 <Star className="w-8 h-8 text-[#F97316] mb-4" />
                 <h3 className="text-2xl font-bold mb-1">Pro</h3>
                 <p className="text-white/60 mb-4">For serious savers</p>
-                <p className="text-4xl font-extrabold mb-6">$4.99<span className="text-base font-normal text-white/50">/month</span></p>
+                <p className="text-4xl font-extrabold mb-6">$7.99<span className="text-base font-normal text-white/50">/month</span></p>
                 <ul className="space-y-2.5">
                   {proPlanFeatures.map((f) => (
                     <li key={f} className="flex items-center gap-2 text-white/85 text-sm">
@@ -726,7 +726,7 @@ export default function Landing() {
                 </ul>
               </div>
               <a
-                href="https://calendly.com/snipcat"
+                href="https://calendly.com/hellosnipcat/30min"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-center w-full py-3 mt-8 rounded-full bg-gray-900 text-white font-semibold hover:bg-black transition-colors dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"

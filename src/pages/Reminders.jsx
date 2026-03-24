@@ -174,7 +174,7 @@ const Reminders = () => {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-3xl font-bold text-[#111827] dark:text-white mb-1">Reminders</h1>
-              <p className="text-[#6B7280] dark:text-gray-400">Never miss a renewal or free trial ending again.</p>
+              <p className="text-[#6B7280] dark:text-gray-400">We'll email you before renewals, price changes, and trial endings.</p>
             </div>
           </div>
         </div>
@@ -265,13 +265,30 @@ const Reminders = () => {
 
         {/* Section 3: Notification Preferences */}
         <section>
-          <h2 className="text-xl font-bold text-[#111827] dark:text-white mb-6">Notification Preferences</h2>
+          <h2 className="text-xl font-bold text-[#111827] dark:text-white mb-4">Notification Preferences</h2>
+
+          {/* Email notification explanation banner */}
+          <div className="flex items-start gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl px-5 py-4 mb-6">
+            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600 dark:text-blue-400">
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-blue-900 dark:text-blue-300">All reminders are sent via email</p>
+              <p className="text-sm text-blue-700 dark:text-blue-400 mt-0.5">
+                We'll send notifications to <span className="font-medium">{user?.email}</span> based on your preferences below.
+              </p>
+            </div>
+          </div>
+
           <div className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#E5E7EB] dark:border-[#2A2D3A] overflow-hidden">
             {/* Renewal Reminders */}
             <div className="px-6 py-5 border-b border-[#F3F4F6] dark:border-[#2A2D3A] flex items-center justify-between">
               <div className="flex-1">
                 <p className="font-semibold text-[#111827] dark:text-white mb-1">Renewal Reminders</p>
-                <p className="text-sm text-[#6B7280] dark:text-gray-400">Get notified before your subscriptions renew</p>
+                <p className="text-sm text-[#6B7280] dark:text-gray-400">Get an email before your subscriptions renew</p>
               </div>
               <div className="flex items-center gap-4 ml-6">
                 <select
@@ -292,7 +309,7 @@ const Reminders = () => {
             <div className="px-6 py-5 border-b border-[#F3F4F6] dark:border-[#2A2D3A] flex items-center justify-between">
               <div className="flex-1">
                 <p className="font-semibold text-[#111827] dark:text-white mb-1">Price Change Alerts</p>
-                <p className="text-sm text-[#6B7280] dark:text-gray-400">Be notified when a subscription price increases</p>
+                <p className="text-sm text-[#6B7280] dark:text-gray-400">Get an email when a subscription price increases</p>
               </div>
               <div className="ml-6">
                 <Toggle enabled={prefs.priceChange} onChange={() => togglePref('priceChange')} />
@@ -303,7 +320,7 @@ const Reminders = () => {
             <div className="px-6 py-5 border-b border-[#F3F4F6] dark:border-[#2A2D3A] flex items-center justify-between">
               <div className="flex-1">
                 <p className="font-semibold text-[#111827] dark:text-white mb-1">Free Trial Warnings</p>
-                <p className="text-sm text-[#6B7280] dark:text-gray-400">Get alerted when your free trial is about to end</p>
+                <p className="text-sm text-[#6B7280] dark:text-gray-400">Get an email when your free trial is about to end</p>
               </div>
               <div className="ml-6">
                 <Toggle enabled={prefs.trialWarning} onChange={() => togglePref('trialWarning')} />
@@ -314,7 +331,7 @@ const Reminders = () => {
             <div className="px-6 py-5 border-b border-[#F3F4F6] dark:border-[#2A2D3A] flex items-center justify-between">
               <div className="flex-1">
                 <p className="font-semibold text-[#111827] dark:text-white mb-1">Weekly Spending Digest</p>
-                <p className="text-sm text-[#6B7280] dark:text-gray-400">Receive a summary of your subscription expenses</p>
+                <p className="text-sm text-[#6B7280] dark:text-gray-400">Receive a weekly email summary of your subscription expenses</p>
               </div>
               <div className="flex items-center gap-4 ml-6">
                 <select

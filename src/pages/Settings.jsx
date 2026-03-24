@@ -4,7 +4,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { getSubscriptions, updateProfile } from '../lib/subscriptions'
-import { createCheckoutSession } from '../lib/stripe'
+import { createCheckoutSession, cancelSubscription } from '../lib/stripe'
 
 export default function Settings() {
   const { theme, setTheme } = useTheme()
@@ -14,6 +14,12 @@ export default function Settings() {
   const [upgrading, setUpgrading] = useState(false)
   const [upgradingError, setUpgradingError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
+
+  // Cancel subscription
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [canceling, setCanceling] = useState(false)
+  const [cancelError, setCancelError] = useState(null)
+  const [canceledMessage, setCanceledMessage] = useState(null)
 
   // Check for successful payment (session_id in URL)
   useEffect(() => {
@@ -51,6 +57,29 @@ export default function Settings() {
       console.error('Upgrade error:', err)
       setUpgradingError(err.message || 'Failed to start upgrade. Please try again.')
       setUpgrading(false)
+    }
+  }
+
+  const handleCancelSubscription = async () => {
+    setCanceling(true)
+    setCancelError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      await cancelSubscription(user.id, session.access_token)
+      setShowCancelModal(false)
+      setCanceledMessage('Your subscription will end at the end of the current billing period.')
+      setTimeout(() => setCanceledMessage(null), 8000)
+
+      // Refresh profile
+      await refreshProfile()
+    } catch (err) {
+      console.error('Cancel subscription error:', err)
+      setCancelError(err.message || 'Failed to cancel subscription. Please try again.')
+      setCanceling(false)
     }
   }
 
@@ -345,6 +374,13 @@ export default function Settings() {
             </div>
           )}
 
+          {canceledMessage && (
+            <div className="bg-[#22C55E]/10 border border-[#22C55E] rounded-lg p-4 mb-6 flex items-start gap-3">
+              <Check className="text-[#22C55E] flex-shrink-0" size={20} />
+              <p className="text-[#166534] dark:text-[#86efac] text-sm font-medium">{canceledMessage}</p>
+            </div>
+          )}
+
           <div className="bg-white dark:bg-[#252836] border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-xl p-6 mb-6">
             <div className="flex items-start justify-between">
               <div>
@@ -383,10 +419,24 @@ export default function Settings() {
               </button>
             </>
           ) : (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-4">
-              <p className="text-blue-900 dark:text-blue-300 font-medium">You are on the Pro plan</p>
-              <p className="text-blue-700 dark:text-blue-400 text-sm mt-1">Thank you for your subscription! Manage your billing in Stripe.</p>
-            </div>
+            <>
+              {cancelError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg p-4 mb-4 flex items-start gap-3">
+                  <AlertTriangle className="text-red-600 dark:text-red-400 flex-shrink-0" size={20} />
+                  <p className="text-red-700 dark:text-red-300 text-sm">{cancelError}</p>
+                </div>
+              )}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-4 mb-4">
+                <p className="text-blue-900 dark:text-blue-300 font-medium">You are on the Pro plan</p>
+                <p className="text-blue-700 dark:text-blue-400 text-sm mt-1">Thank you for your subscription! Manage your billing in Stripe.</p>
+              </div>
+              <button
+                onClick={() => setShowCancelModal(true)}
+                className="w-full py-3.5 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-base"
+              >
+                Cancel Subscription
+              </button>
+            </>
           )}
         </div>
 
@@ -514,6 +564,47 @@ export default function Settings() {
                 className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {deleting ? 'Deleting...' : 'Delete Forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Subscription Confirmation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !canceling && setShowCancelModal(false)} />
+          <div className="relative bg-white dark:bg-[#1C1F2E] rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} className="text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <h3 className="text-xl font-bold text-[#111827] dark:text-white">Cancel subscription?</h3>
+            </div>
+            <p className="text-[#6B7280] dark:text-gray-400 mb-6">
+              Are you sure? Your Pro features will remain active until the end of your billing period.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                disabled={canceling}
+                className="flex-1 py-2.5 border border-[#E5E7EB] dark:border-[#2A2D3A] text-[#6B7280] dark:text-gray-400 bg-white dark:bg-[#252836] rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-[#2A2D3A] transition-colors disabled:opacity-50"
+              >
+                Keep Subscription
+              </button>
+              <button
+                onClick={handleCancelSubscription}
+                disabled={canceling}
+                className="flex-1 py-2.5 bg-yellow-600 text-white rounded-xl font-medium hover:bg-yellow-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {canceling ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Canceling...
+                  </>
+                ) : (
+                  'Cancel Subscription'
+                )}
               </button>
             </div>
           </div>

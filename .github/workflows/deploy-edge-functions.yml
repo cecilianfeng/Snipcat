@@ -51,6 +51,11 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      - name: Deploy cancel-subscription function
+        run: supabase functions deploy cancel-subscription --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Deployment Summary
         if: success()
         run: |
@@ -61,3 +66,4 @@ jobs:
           echo "- notify-price-change"
           echo "- create-checkout-session"
           echo "- stripe-webhook"
+          echo "- cancel-subscription"

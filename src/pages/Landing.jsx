@@ -618,7 +618,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <SectionHeading title="Simple, Honest Pricing" subtitle="Start free. Upgrade when you need more." />
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mt-14 items-stretch">
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mt-14 items-stretch">
             {/* Free */}
             <motion.div
               className="bg-white border border-gray-200 rounded-2xl p-8 flex flex-col"
@@ -687,6 +687,50 @@ export default function Landing() {
               >
                 {upgrading ? 'Loading...' : 'Start Saving Now'}
               </button>
+            </motion.div>
+
+            {/* Enterprise */}
+            <motion.div
+              className="bg-white border-2 border-gray-900 rounded-2xl p-8 flex flex-col relative overflow-hidden dark:bg-gray-900 dark:border-gray-700"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-900/5 to-[#F97316]/5 pointer-events-none" />
+              <div className="relative flex-1 flex flex-col">
+                <Shield className="w-8 h-8 text-gray-900 mb-4 dark:text-white" />
+                <h3 className="text-2xl font-bold mb-1 text-gray-900 dark:text-white">Enterprise</h3>
+                <p className="text-gray-600 mb-4 dark:text-gray-400">Custom solutions for teams</p>
+                <p className="text-4xl font-extrabold mb-6 text-gray-900 dark:text-white">Let's Talk</p>
+                <ul className="space-y-2.5">
+                  <li className="flex items-center gap-2 text-gray-700 text-sm dark:text-gray-300">
+                    <Check className="w-4 h-4 text-gray-900 flex-shrink-0 dark:text-white" />Everything in Pro
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-700 text-sm dark:text-gray-300">
+                    <Check className="w-4 h-4 text-gray-900 flex-shrink-0 dark:text-white" />Dedicated account manager
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-700 text-sm dark:text-gray-300">
+                    <Check className="w-4 h-4 text-gray-900 flex-shrink-0 dark:text-white" />Custom integrations
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-700 text-sm dark:text-gray-300">
+                    <Check className="w-4 h-4 text-gray-900 flex-shrink-0 dark:text-white" />Team subscription management
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-700 text-sm dark:text-gray-300">
+                    <Check className="w-4 h-4 text-gray-900 flex-shrink-0 dark:text-white" />Priority support
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-700 text-sm dark:text-gray-300">
+                    <Check className="w-4 h-4 text-gray-900 flex-shrink-0 dark:text-white" />Custom reporting & analytics
+                  </li>
+                </ul>
+              </div>
+              <a
+                href="mailto:hello@snipcat.app"
+                className="block text-center w-full py-3 mt-8 rounded-full bg-gray-900 text-white font-semibold hover:bg-black transition-colors dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+              >
+                Contact Us
+              </a>
             </motion.div>
           </div>
         </div>

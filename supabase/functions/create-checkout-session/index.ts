@@ -72,6 +72,32 @@ serve(async (req: Request) => {
 
     const userEmail = user.email;
 
+    // Check if user already has a Stripe customer ID in profiles
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("stripe_customer_id")
+      .eq("id", user_id)
+      .single();
+
+    // Build checkout session params
+    const params: Record<string, string> = {
+      "mode": "subscription",
+      "payment_method_types[]": "card",
+      "line_items[0][price]": price_id,
+      "line_items[0][quantity]": "1",
+      "success_url": `https://www.snipcat.app/settings?session_id={CHECKOUT_SESSION_ID}`,
+      "cancel_url": `https://www.snipcat.app/settings`,
+      "client_reference_id": user_id,
+      "metadata[user_id]": user_id,
+    };
+
+    // Use existing customer if available, otherwise use email
+    if (profile?.stripe_customer_id) {
+      params["customer"] = profile.stripe_customer_id;
+    } else {
+      params["customer_email"] = userEmail;
+    }
+
     // Create Stripe checkout session
     const checkoutSessionResponse = await fetch(
       "https://api.stripe.com/v1/checkout/sessions",
@@ -81,25 +107,24 @@ serve(async (req: Request) => {
           "Authorization": `Bearer ${STRIPE_SECRET_KEY}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({
-          "mode": "subscription",
-          "payment_method_types[]": "card",
-          "line_items[0][price]": price_id,
-          "line_items[0][quantity]": "1",
-          "success_url": `https://www.snipcat.app/settings?session_id={CHECKOUT_SESSION_ID}`,
-          "cancel_url": `https://www.snipcat.app/settings`,
-          "customer_email": userEmail,
-          "client_reference_id": user_id,
-          "metadata[user_id]": user_id,
-        }),
+        body: new URLSearchParams(params),
       }
     );
 
     if (!checkoutSessionResponse.ok) {
-      const error = await checkoutSessionResponse.text();
-      console.error("Stripe API error:", error);
+      const errorBody = await checkoutSessionResponse.text();
+      console.error("Stripe API error:", errorBody);
+      let errorMessage = "Failed to create checkout session";
+      try {
+        const parsed = JSON.parse(errorBody);
+        if (parsed.error?.message) {
+          errorMessage = parsed.error.message;
+        }
+      } catch (_) {
+        // keep default message
+      }
       return new Response(
-        JSON.stringify({ error: "Failed to create checkout session" }),
+        JSON.stringify({ error: errorMessage }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

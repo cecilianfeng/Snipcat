@@ -1,6 +1,6 @@
 // Stripe configuration
 export const STRIPE_PUBLISHABLE_KEY = 'pk_test_51TDzPYELocpZYQGEJPqDbaJVB4d73W3w6DlEhNXFtHH9Ft5qCtDs6jwxeqz3ch3BPEgIw4GM80ygqBejvd0A7NSu00AnArCQEA'
-export const STRIPE_PRICE_ID = 'price_1TDzZIELocpZYQGEbNwBhp4d'
+export const STRIPE_PRICE_ID = 'price_1TEZhXELocpZYQGETJ3xlJFJ'
 
 /**
  * Call the create-checkout-session edge function to get a Stripe checkout URL

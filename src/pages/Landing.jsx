@@ -901,7 +901,7 @@ export default function Landing() {
               <p className="font-semibold text-gray-900 mb-3 text-sm">Connect</p>
               <ul className="space-y-2 text-sm text-gray-500">
                 <li><a href="https://x.com/snipcat_app" target="_blank" rel="noopener noreferrer" className="hover:text-[#F97316] transition-colors">Twitter</a></li>
-                <li><a href="mailto:hello@snipcat.app" className="hover:text-[#F97316] transition-colors">hello@snipcat.app</a></li>
+                <li><a href="mailto:hellosnipcat@gmail.com" className="hover:text-[#F97316] transition-colors">hello@snipcat.app</a></li>
               </ul>
             </div>
           </div>

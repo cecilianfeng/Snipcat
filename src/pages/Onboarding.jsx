@@ -132,8 +132,8 @@ export default function Onboarding() {
     <div className="min-h-screen bg-gradient-to-b from-white via-orange-50/30 to-white flex flex-col items-center justify-center px-4">
       {/* Logo */}
       <div className="absolute top-6 left-6 flex items-center gap-2">
-        <CatLogo size={32} />
-        <span className="text-xl font-bold text-gray-900">Snip<span className="text-[#F97316]">Kitty</span></span>
+        <img src="/snipcat-logo.png" alt="Snipcat" className="w-8 h-8" />
+        <span className="text-xl font-bold text-gray-900">Snip<span className="text-[#F97316]">cat</span></span>
       </div>
 
       {/* Progress Dots */}

@@ -7,7 +7,7 @@ export default function Terms() {
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-gray-100">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="font-bold text-gray-900 flex items-center gap-1.5">
-            <span className="text-[#F97316]">✂</span> Snipcat
+            <img src="/snipcat-logo.png" alt="Snipcat" className="w-6 h-6" /> Snipcat
           </Link>
           <Link to="/" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
             ← Back to home

@@ -24,3 +24,6 @@ verify_jwt = false
 
 [functions.cancel-subscription]
 verify_jwt = false
+
+[functions.create-portal-session]
+verify_jwt = false

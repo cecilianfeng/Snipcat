@@ -111,10 +111,10 @@ export default function Settings() {
     }
   }
 
-  // Derive user info from Google auth
-  const fullName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
+  // Derive user info — prefer profile data, fall back to Google auth metadata
+  const fullName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
   const email = user?.email || ''
-  const avatarUrl = user?.user_metadata?.avatar_url
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url
   const initials = fullName
     .split(' ')
     .map(n => n[0])
@@ -126,6 +126,13 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState(fullName)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
+
+  // Sync displayName when profile changes (e.g. after save & refresh)
+  useEffect(() => {
+    if (profile?.full_name) {
+      setDisplayName(profile.full_name)
+    }
+  }, [profile?.full_name])
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState(null)
   const fileInputRef = useRef(null)
@@ -537,14 +544,41 @@ export default function Settings() {
                         >
                           Cancel Subscription
                         </button>
-                        <a
-                          href="https://billing.stripe.com/p/login/dummystripe"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block px-4 py-2.5 text-sm font-medium text-[#6B7280] dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252836] transition-colors"
+                        <button
+                          onClick={async () => {
+                            setShowMoreMenu(false)
+                            try {
+                              const { data: { session } } = await supabase.auth.getSession()
+                              if (!session) return
+                              const res = await fetch(
+                                'https://zxhgviraiiytpdjbuhpy.functions.supabase.co/create-portal-session',
+                                {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    Authorization: `Bearer ${session.access_token}`,
+                                  },
+                                  body: JSON.stringify({
+                                    user_id: user.id,
+                                    origin: window.location.origin,
+                                  }),
+                                }
+                              )
+                              const data = await res.json()
+                              if (data.url) {
+                                window.open(data.url, '_blank')
+                              } else {
+                                alert(data.error || 'Unable to open billing portal')
+                              }
+                            } catch (err) {
+                              console.error('Portal error:', err)
+                              alert('Unable to open billing portal. Please try again.')
+                            }
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-[#6B7280] dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252836] transition-colors"
                         >
                           View Invoice History
-                        </a>
+                        </button>
                       </div>
                     )}
                   </div>

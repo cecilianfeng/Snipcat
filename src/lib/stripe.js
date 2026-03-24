@@ -21,6 +21,7 @@ export async function createCheckoutSession(userId, token) {
         body: JSON.stringify({
           user_id: userId,
           price_id: STRIPE_PRICE_ID,
+          origin: window.location.origin,
         }),
       }
     )

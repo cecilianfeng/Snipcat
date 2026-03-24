@@ -40,7 +40,8 @@ serve(async (req: Request) => {
 
     // Parse request body
     const body = await req.json();
-    const { user_id, price_id } = body;
+    const { user_id, price_id, origin } = body;
+    const siteOrigin = origin || "https://www.snipcat.app";
 
     if (!user_id || !price_id) {
       return new Response(
@@ -85,8 +86,8 @@ serve(async (req: Request) => {
       "payment_method_types[]": "card",
       "line_items[0][price]": price_id,
       "line_items[0][quantity]": "1",
-      "success_url": `https://www.snipcat.app/settings?session_id={CHECKOUT_SESSION_ID}`,
-      "cancel_url": `https://www.snipcat.app/settings`,
+      "success_url": `${siteOrigin}/settings?session_id={CHECKOUT_SESSION_ID}`,
+      "cancel_url": `${siteOrigin}/settings`,
       "client_reference_id": user_id,
       "metadata[user_id]": user_id,
     };

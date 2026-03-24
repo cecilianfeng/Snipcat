@@ -568,11 +568,11 @@ export default function Settings() {
                               if (data.url) {
                                 window.open(data.url, '_blank')
                               } else {
-                                alert(data.error || 'Unable to open billing portal')
+                                setUpgradingError(data.error || 'Unable to open billing portal')
                               }
                             } catch (err) {
                               console.error('Portal error:', err)
-                              alert('Unable to open billing portal. Please try again.')
+                              setUpgradingError('Unable to open billing portal. Please try again.')
                             }
                           }}
                           className="w-full text-left px-4 py-2.5 text-sm font-medium text-[#6B7280] dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252836] transition-colors"

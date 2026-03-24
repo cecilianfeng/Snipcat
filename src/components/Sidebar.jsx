@@ -13,9 +13,9 @@ export default function Sidebar() {
     { path: '/settings', label: 'Settings', icon: Settings },
   ]
 
-  // Get user display info from Google auth metadata
-  const fullName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
-  const avatarUrl = user?.user_metadata?.avatar_url
+  // Get user display info — prefer profile data, fall back to Google auth metadata
+  const fullName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url
   const initials = fullName
     .split(' ')
     .map(n => n[0])

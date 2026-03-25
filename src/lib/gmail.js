@@ -578,8 +578,21 @@ async function searchAllMessages(token, query, maxTotal = 500) {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`Gmail search failed: ${res.status} ${err}`)
+      const errText = await res.text()
+      // Parse error for user-friendly message
+      if (res.status === 403) {
+        // Check if it's a scope/permission issue
+        let detail = ''
+        try { detail = JSON.parse(errText)?.error?.message || '' } catch {}
+        if (detail.toLowerCase().includes('scope') || detail.toLowerCase().includes('permission') || detail.toLowerCase().includes('insufficient')) {
+          throw new Error('Gmail permission denied. Please sign out and sign in again to grant inbox access.')
+        }
+        throw new Error('Gmail access was denied. Your Gmail permissions may have expired — please sign out and sign in again.')
+      }
+      if (res.status === 401) {
+        throw new Error('Gmail session expired. Please sign out and sign in again to refresh your access.')
+      }
+      throw new Error(`Gmail scan failed (${res.status}). Please try again or sign out and sign in again.`)
     }
 
     const data = await res.json()

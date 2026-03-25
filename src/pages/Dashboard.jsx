@@ -209,7 +209,13 @@ const Dashboard = () => {
       setScanResult({ addedCount, updatedCount, confirmedTotal: confirmed.length, reviewCount: reviewFiltered.length })
     } catch (err) {
       console.error('Scan failed:', err)
-      setScanResult({ error: err.message })
+      // Ensure error message is a clean, user-friendly string (never raw API data)
+      let errorMsg = err?.message || 'Scan failed. Please try again.'
+      // Truncate if it looks like raw API response (> 200 chars or contains JSON)
+      if (errorMsg.length > 200 || errorMsg.includes('{"') || errorMsg.includes('<!DOCTYPE')) {
+        errorMsg = 'Gmail scan failed. Please sign out and sign in again to refresh your Gmail access.'
+      }
+      setScanResult({ error: errorMsg })
     } finally {
       setScanning(false)
     }

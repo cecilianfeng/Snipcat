@@ -32,7 +32,8 @@ async function callAnalyzeEmail(candidates) {
 
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(`Edge Function error ${response.status}: ${text}`)
+    console.error(`Edge Function error ${response.status}:`, text)
+    throw new Error(`AI analysis failed (${response.status}). The service may be temporarily unavailable.`)
   }
 
   const data = await response.json()

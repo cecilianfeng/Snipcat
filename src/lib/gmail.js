@@ -27,6 +27,70 @@ import { analyzeWithAI } from './ai-analysis.js'
 
 const GMAIL_API = 'https://www.googleapis.com/gmail/v1/users/me'
 
+// ─── AI PRE-JUDGMENT FOR UNKNOWN SERVICES ───
+const _EDGE_FUNCTION_URL = 'https://zxhgviraiiytpdjbuhpy.supabase.co/functions/v1/analyze-email'
+const _SUPABASE_ANON_KEY = 'sb_publishable_c3MRfQVEtQUt6SdQFYq5Kw_kURhd3S8'
+
+/**
+ * Lightweight AI pre-judgment for unknown services with no STRONG subscription keywords.
+ * Sends ONLY domain + subjects (no body) to save tokens.
+ * Returns an array of domains that AI considers "subscription-like".
+ *
+ * @param {Array<{domain: string, subjects: string[]}>} items
+ * @returns {Promise<Set<string>>} set of domains that passed AI pre-judgment
+ */
+async function preJudgeUnknownServices(items) {
+  if (!items || items.length === 0) return new Set()
+
+  const passed = new Set()
+  const BATCH_SIZE = 10
+
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE)
+    const candidates = batch.map(({ domain, subjects }) => ({
+      domain,
+      emails: subjects.slice(0, 5).map(subject => ({
+        subject,
+        bodyText: '', // subjects only — no body to save tokens
+        from: '',
+      })),
+      _preJudge: true, // signal to AI: lightweight check only
+    }))
+
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 5000)
+
+      const response = await fetch(_EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${_SUPABASE_ANON_KEY}`,
+          'apikey': _SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ candidates }),
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+
+      if (!response.ok) continue
+
+      const data = await response.json()
+      if (!data.success || !data.results) continue
+
+      data.results.forEach((result, idx) => {
+        if (result.isSubscription && result.confidence !== 'low') {
+          passed.add(batch[idx].domain)
+        }
+      })
+    } catch (_err) {
+      // Timeout or network error — skip this batch (conservative: don't pass unknowns)
+    }
+  }
+
+  return passed
+}
+
 // ─── KNOWN SUBSCRIPTION SERVICES ───
 // Matched by sender root domain. For multi-product domains (apple.com, google.com, etc.)
 // we also check subject keywords.
@@ -41,6 +105,7 @@ const KNOWN_SUBSCRIPTIONS = {
   'perplexity.ai':     { name: 'Perplexity', category: 'ai-tools', logo: 'perplexity.ai' },
   'jasper.ai':         { name: 'Jasper AI', category: 'ai-tools', logo: 'jasper.ai' },
   'runwayml.com':      { name: 'Runway', category: 'ai-tools', logo: 'runwayml.com' },
+  'runway.com':        { name: 'Runway', category: 'ai-tools', logo: 'runwayml.com' },
   'elevenlabs.io':     { name: 'ElevenLabs', category: 'ai-tools', logo: 'elevenlabs.io' },
   'pika.art':          { name: 'Pika', category: 'ai-tools', logo: 'pika.art' },
   'lumalabs.ai':       { name: 'Luma AI', category: 'ai-tools', logo: 'lumalabs.ai' },
@@ -59,9 +124,18 @@ const KNOWN_SUBSCRIPTIONS = {
   'descript.com':      { name: 'Descript', category: 'ai-tools', logo: 'descript.com' },
   'fathom.video':      { name: 'Fathom', category: 'ai-tools', logo: 'fathom.video' },
   'otter.ai':          { name: 'Otter.ai', category: 'ai-tools', logo: 'otter.ai' },
+  'fireflies.ai':      { name: 'Fireflies.ai', category: 'ai-tools', logo: 'fireflies.ai' },
   'character.ai':      { name: 'Character.ai', category: 'ai-tools', logo: 'character.ai' },
   'magai.co':          { name: 'Magai', category: 'ai-tools', logo: 'magai.co' },
   'replit.com':        { name: 'Replit', category: 'ai-tools', logo: 'replit.com' },
+  'krea.ai':           { name: 'Krea AI', category: 'ai-tools', logo: 'krea.ai' },
+  'ideogram.ai':       { name: 'Ideogram', category: 'ai-tools', logo: 'ideogram.ai' },
+  'adobefirefly.com':  { name: 'Adobe Firefly', category: 'ai-tools', logo: 'adobe.com' },
+  'leonardo.ai':       { name: 'Leonardo AI', category: 'ai-tools', logo: 'leonardo.ai' },
+  'getimg.ai':         { name: 'getimg.ai', category: 'ai-tools', logo: 'getimg.ai' },
+  'stability.ai':      { name: 'Stability AI', category: 'ai-tools', logo: 'stability.ai' },
+  'hailuo.ai':         { name: 'Hailuo AI', category: 'ai-tools', logo: 'hailuo.ai' },
+  'notebooklm.google.com': { name: 'NotebookLM', category: 'ai-tools', logo: 'google.com' },
 
   // ── Entertainment / Video Streaming ──
   'netflix.com':         { name: 'Netflix', category: 'entertainment', logo: 'netflix.com' },
@@ -87,6 +161,18 @@ const KNOWN_SUBSCRIPTIONS = {
   'fubo.tv':             { name: 'fuboTV', category: 'entertainment', logo: 'fubo.tv' },
   'sling.com':           { name: 'Sling TV', category: 'entertainment', logo: 'sling.com' },
   'twitch.tv':           { name: 'Twitch', category: 'entertainment', logo: 'twitch.tv' },
+  'discoveryplus.com':   { name: 'Discovery+', category: 'entertainment', logo: 'discoveryplus.com' },
+  'philo.com':           { name: 'Philo', category: 'entertainment', logo: 'philo.com' },
+  'frndlytv.com':        { name: 'Frndly TV', category: 'entertainment', logo: 'frndlytv.com' },
+  'plex.tv':             { name: 'Plex Pass', category: 'entertainment', logo: 'plex.tv' },
+  'emby.media':          { name: 'Emby Premiere', category: 'entertainment', logo: 'emby.media' },
+  'starzplay.com':       { name: 'Starz', category: 'entertainment', logo: 'starzplay.com' },
+  'starz.com':           { name: 'Starz', category: 'entertainment', logo: 'starz.com' },
+  'showtime.com':        { name: 'Showtime', category: 'entertainment', logo: 'showtime.com' },
+  'mgmplus.com':         { name: 'MGM+', category: 'entertainment', logo: 'mgmplus.com' },
+  'hallmarkmovies.com':  { name: 'Hallmark Movies Now', category: 'entertainment', logo: 'hallmarkmovies.com' },
+  'acorntv.com':         { name: 'Acorn TV', category: 'entertainment', logo: 'acorntv.com' },
+  'sundancenow.com':     { name: 'Sundance Now', category: 'entertainment', logo: 'sundancenow.com' },
 
   // ── Music & Audio ──
   'spotify.com':       { name: 'Spotify', category: 'music', logo: 'spotify.com' },
@@ -98,15 +184,29 @@ const KNOWN_SUBSCRIPTIONS = {
   'pandora.com':       { name: 'Pandora', category: 'music', logo: 'pandora.com' },
   'siriusxm.com':      { name: 'SiriusXM', category: 'music', logo: 'siriusxm.com' },
   'qobuz.com':         { name: 'Qobuz', category: 'music', logo: 'qobuz.com' },
+  'napster.com':       { name: 'Napster', category: 'music', logo: 'napster.com' },
+  'iheartradio.com':   { name: 'iHeartRadio All Access', category: 'music', logo: 'iheartradio.com' },
+  'mixcloud.com':      { name: 'Mixcloud Select', category: 'music', logo: 'mixcloud.com' },
+  'bandcamp.com':      { name: 'Bandcamp Fan', category: 'music', logo: 'bandcamp.com' },
+  'nugs.net':          { name: 'nugs.net', category: 'music', logo: 'nugs.net' },
 
   // ── Gaming ──
   'playstation.com':   { name: 'PlayStation Plus', category: 'gaming', logo: 'playstation.com' },
   'sonyentertainmentnetwork.com': { name: 'PlayStation Plus', category: 'gaming', logo: 'playstation.com' },
+  'xbox.com':          { name: 'Xbox Game Pass', category: 'gaming', logo: 'xbox.com' },
   'ea.com':            { name: 'EA Play', category: 'gaming', logo: 'ea.com' },
   'ubisoft.com':       { name: 'Ubisoft+', category: 'gaming', logo: 'ubisoft.com' },
   'steampowered.com':  { name: 'Steam', category: 'gaming', logo: 'steampowered.com' },
   'humblebundle.com':  { name: 'Humble Bundle', category: 'gaming', logo: 'humblebundle.com' },
   'roblox.com':        { name: 'Roblox Premium', category: 'gaming', logo: 'roblox.com' },
+  'epicgames.com':     { name: 'Epic Games', category: 'gaming', logo: 'epicgames.com' },
+  'nintendo.com':      { name: 'Nintendo Switch Online', category: 'gaming', logo: 'nintendo.com' },
+  'gog.com':           { name: 'GOG', category: 'gaming', logo: 'gog.com' },
+  'battlenet.com':     { name: 'Battle.net', category: 'gaming', logo: 'battlenet.com' },
+  'blizzard.com':      { name: 'Blizzard', category: 'gaming', logo: 'blizzard.com' },
+  'riot.com':          { name: 'Riot Games', category: 'gaming', logo: 'riotgames.com' },
+  'riotgames.com':     { name: 'Riot Games', category: 'gaming', logo: 'riotgames.com' },
+  'gameloft.com':      { name: 'Gameloft', category: 'gaming', logo: 'gameloft.com' },
 
   // ── Productivity & Workspace ──
   'notion.so':         { name: 'Notion', category: 'productivity', logo: 'notion.so' },
@@ -132,10 +232,35 @@ const KNOWN_SUBSCRIPTIONS = {
   'make.com':          { name: 'Make', category: 'productivity', logo: 'make.com' },
   'ifttt.com':         { name: 'IFTTT', category: 'productivity', logo: 'ifttt.com' },
   'superhuman.com':    { name: 'Superhuman', category: 'productivity', logo: 'superhuman.com' },
+  'basecamp.com':      { name: 'Basecamp', category: 'productivity', logo: 'basecamp.com' },
+  'teamwork.com':      { name: 'Teamwork', category: 'productivity', logo: 'teamwork.com' },
+  'wrike.com':         { name: 'Wrike', category: 'productivity', logo: 'wrike.com' },
+  'smartsheet.com':    { name: 'Smartsheet', category: 'productivity', logo: 'smartsheet.com' },
+  'jira.com':          { name: 'Jira', category: 'productivity', logo: 'atlassian.com' },
+  'atlassian.com':     { name: 'Atlassian', category: 'productivity', logo: 'atlassian.com' },
+  'confluence.com':    { name: 'Confluence', category: 'productivity', logo: 'atlassian.com' },
+  'harvest.com':       { name: 'Harvest', category: 'productivity', logo: 'getharvest.com' },
+  'getharvest.com':    { name: 'Harvest', category: 'productivity', logo: 'getharvest.com' },
+  'toggl.com':         { name: 'Toggl Track', category: 'productivity', logo: 'toggl.com' },
+  'clockify.me':       { name: 'Clockify', category: 'productivity', logo: 'clockify.me' },
+  'whereby.com':       { name: 'Whereby', category: 'productivity', logo: 'whereby.com' },
+  'around.co':         { name: 'Around', category: 'productivity', logo: 'around.co' },
+  'gather.town':       { name: 'Gather', category: 'productivity', logo: 'gather.town' },
+  'webex.com':         { name: 'Webex', category: 'productivity', logo: 'webex.com' },
+  'gotomeeting.com':   { name: 'GoTo Meeting', category: 'productivity', logo: 'goto.com' },
+  'goto.com':          { name: 'GoTo', category: 'productivity', logo: 'goto.com' },
+  'microsoftteams.com': { name: 'Microsoft Teams', category: 'productivity', logo: 'microsoft.com' },
+  'microsoft365.com':  { name: 'Microsoft 365', category: 'productivity', logo: 'microsoft.com' },
+  'office.com':        { name: 'Microsoft 365', category: 'productivity', logo: 'microsoft.com' },
+  'dropbox.com':       { name: 'Dropbox', category: 'cloud-storage', logo: 'dropbox.com' },
+  'notion.com':        { name: 'Notion', category: 'productivity', logo: 'notion.so' },
+  'fibery.io':         { name: 'Fibery', category: 'productivity', logo: 'fibery.io' },
+  'height.app':        { name: 'Height', category: 'productivity', logo: 'height.app' },
 
   // ── Developer Tools ──
   'github.com':        { name: 'GitHub', category: 'developer-tools', logo: 'github.com' },
   'gitlab.com':        { name: 'GitLab', category: 'developer-tools', logo: 'gitlab.com' },
+  'bitbucket.org':     { name: 'Bitbucket', category: 'developer-tools', logo: 'bitbucket.org' },
   'figma.com':         { name: 'Figma', category: 'developer-tools', logo: 'figma.com' },
   'vercel.com':        { name: 'Vercel', category: 'developer-tools', logo: 'vercel.com' },
   'netlify.com':       { name: 'Netlify', category: 'developer-tools', logo: 'netlify.com' },
@@ -146,6 +271,7 @@ const KNOWN_SUBSCRIPTIONS = {
   'supabase.com':      { name: 'Supabase', category: 'developer-tools', logo: 'supabase.com' },
   'supabase.io':       { name: 'Supabase', category: 'developer-tools', logo: 'supabase.com' },
   'postman.com':       { name: 'Postman', category: 'developer-tools', logo: 'postman.com' },
+  'insomnia.rest':     { name: 'Insomnia', category: 'developer-tools', logo: 'insomnia.rest' },
   'jetbrains.com':     { name: 'JetBrains', category: 'developer-tools', logo: 'jetbrains.com' },
   'cloudflare.com':    { name: 'Cloudflare', category: 'developer-tools', logo: 'cloudflare.com' },
   'mongodb.com':       { name: 'MongoDB Atlas', category: 'developer-tools', logo: 'mongodb.com' },
@@ -157,6 +283,33 @@ const KNOWN_SUBSCRIPTIONS = {
   'algolia.com':       { name: 'Algolia', category: 'developer-tools', logo: 'algolia.com' },
   'twilio.com':        { name: 'Twilio', category: 'developer-tools', logo: 'twilio.com' },
   'sendgrid.com':      { name: 'SendGrid', category: 'developer-tools', logo: 'sendgrid.com' },
+  'datadog.com':       { name: 'Datadog', category: 'developer-tools', logo: 'datadog.com' },
+  'newrelic.com':      { name: 'New Relic', category: 'developer-tools', logo: 'newrelic.com' },
+  'pagerduty.com':     { name: 'PagerDuty', category: 'developer-tools', logo: 'pagerduty.com' },
+  'launchdarkly.com':  { name: 'LaunchDarkly', category: 'developer-tools', logo: 'launchdarkly.com' },
+  'split.io':          { name: 'Split', category: 'developer-tools', logo: 'split.io' },
+  'grafana.com':       { name: 'Grafana Cloud', category: 'developer-tools', logo: 'grafana.com' },
+  'atlassian.net':     { name: 'Atlassian', category: 'developer-tools', logo: 'atlassian.com' },
+  'jira.atlassian.com': { name: 'Jira', category: 'developer-tools', logo: 'atlassian.com' },
+  'aws.amazon.com':    { name: 'Amazon Web Services', category: 'developer-tools', logo: 'aws.amazon.com' },
+  'azure.microsoft.com': { name: 'Microsoft Azure', category: 'developer-tools', logo: 'azure.microsoft.com' },
+  'cloud.google.com':  { name: 'Google Cloud', category: 'developer-tools', logo: 'cloud.google.com' },
+  'linode.com':        { name: 'Linode (Akamai)', category: 'developer-tools', logo: 'linode.com' },
+  'akamai.com':        { name: 'Akamai', category: 'developer-tools', logo: 'akamai.com' },
+  'fastly.com':        { name: 'Fastly', category: 'developer-tools', logo: 'fastly.com' },
+  'neon.tech':         { name: 'Neon', category: 'developer-tools', logo: 'neon.tech' },
+  'turso.tech':        { name: 'Turso', category: 'developer-tools', logo: 'turso.tech' },
+  'upstash.com':       { name: 'Upstash', category: 'developer-tools', logo: 'upstash.com' },
+  'redis.com':         { name: 'Redis Cloud', category: 'developer-tools', logo: 'redis.com' },
+  'elastic.co':        { name: 'Elastic', category: 'developer-tools', logo: 'elastic.co' },
+  'snowflake.com':     { name: 'Snowflake', category: 'developer-tools', logo: 'snowflake.com' },
+  'databricks.com':    { name: 'Databricks', category: 'developer-tools', logo: 'databricks.com' },
+  'mixpanel.com':      { name: 'Mixpanel', category: 'developer-tools', logo: 'mixpanel.com' },
+  'amplitude.com':     { name: 'Amplitude', category: 'developer-tools', logo: 'amplitude.com' },
+  'segment.com':       { name: 'Segment', category: 'developer-tools', logo: 'segment.com' },
+  'logrocket.com':     { name: 'LogRocket', category: 'developer-tools', logo: 'logrocket.com' },
+  'hotjar.com':        { name: 'Hotjar', category: 'developer-tools', logo: 'hotjar.com' },
+  'fullstory.com':     { name: 'FullStory', category: 'developer-tools', logo: 'fullstory.com' },
 
   // ── Design & Creative ──
   'brandcrowd.com':    { name: 'BrandCrowd', category: 'design', logo: 'brandcrowd.com' },
@@ -170,9 +323,29 @@ const KNOWN_SUBSCRIPTIONS = {
   'creativemarket.com': { name: 'Creative Market', category: 'design', logo: 'creativemarket.com' },
   'jitter.video':      { name: 'Jitter', category: 'design', logo: 'jitter.video' },
   'snackthis.co':      { name: 'Jitter', category: 'design', logo: 'jitter.video' },
+  'mobbin.com':        { name: 'Mobbin', category: 'design', logo: 'mobbin.com' },
+  'zeplin.io':         { name: 'Zeplin', category: 'design', logo: 'zeplin.io' },
+  'principle.com':     { name: 'Principle', category: 'design', logo: 'principle.com' },
+  'dribbble.com':      { name: 'Dribbble Pro', category: 'design', logo: 'dribbble.com' },
+  'behance.net':       { name: 'Behance', category: 'design', logo: 'behance.net' },
+  'storyblok.com':     { name: 'Storyblok', category: 'design', logo: 'storyblok.com' },
+  'pitch.com':         { name: 'Pitch', category: 'design', logo: 'pitch.com' },
+  'beautiful.ai':      { name: 'Beautiful.ai', category: 'design', logo: 'beautiful.ai' },
+  'visme.co':          { name: 'Visme', category: 'design', logo: 'visme.co' },
+  'piktochart.com':    { name: 'Piktochart', category: 'design', logo: 'piktochart.com' },
+  'pixelmator.com':    { name: 'Pixelmator Pro', category: 'design', logo: 'pixelmator.com' },
+  'affinity.serif.com': { name: 'Affinity', category: 'design', logo: 'affinity.serif.com' },
+  'serif.com':         { name: 'Affinity', category: 'design', logo: 'affinity.serif.com' },
+  'icons8.com':        { name: 'Icons8', category: 'design', logo: 'icons8.com' },
+  'flaticon.com':      { name: 'Flaticon', category: 'design', logo: 'flaticon.com' },
+  'iconfinder.com':    { name: 'Iconfinder', category: 'design', logo: 'iconfinder.com' },
+  'noun-project.com':  { name: 'Noun Project', category: 'design', logo: 'thenounproject.com' },
+  'shutterstock.com':  { name: 'Shutterstock', category: 'design', logo: 'shutterstock.com' },
+  'gettyimages.com':   { name: 'Getty Images', category: 'design', logo: 'gettyimages.com' },
+  'unsplash.com':      { name: 'Unsplash+', category: 'design', logo: 'unsplash.com' },
+  'stocksy.com':       { name: 'Stocksy', category: 'design', logo: 'stocksy.com' },
 
   // ── Cloud Storage & Backup ──
-  'dropbox.com':       { name: 'Dropbox', category: 'cloud-storage', logo: 'dropbox.com' },
   'box.com':           { name: 'Box', category: 'cloud-storage', logo: 'box.com' },
   'pcloud.com':        { name: 'pCloud', category: 'cloud-storage', logo: 'pcloud.com' },
   'backblaze.com':     { name: 'Backblaze', category: 'cloud-storage', logo: 'backblaze.com' },
@@ -180,6 +353,11 @@ const KNOWN_SUBSCRIPTIONS = {
   'sync.com':          { name: 'Sync.com', category: 'cloud-storage', logo: 'sync.com' },
   'mega.nz':           { name: 'MEGA', category: 'cloud-storage', logo: 'mega.nz' },
   'mega.io':           { name: 'MEGA', category: 'cloud-storage', logo: 'mega.nz' },
+  'tresorit.com':      { name: 'Tresorit', category: 'cloud-storage', logo: 'tresorit.com' },
+  'internxt.com':      { name: 'Internxt', category: 'cloud-storage', logo: 'internxt.com' },
+  'iclouddrive.com':   { name: 'iCloud+', category: 'cloud-storage', logo: 'apple.com' },
+  'crashplan.com':     { name: 'CrashPlan', category: 'cloud-storage', logo: 'crashplan.com' },
+  'acronis.com':       { name: 'Acronis', category: 'cloud-storage', logo: 'acronis.com' },
 
   // ── VPN & Security ──
   'nordvpn.com':       { name: 'NordVPN', category: 'security', logo: 'nordvpn.com' },
@@ -187,6 +365,7 @@ const KNOWN_SUBSCRIPTIONS = {
   'surfshark.com':     { name: 'Surfshark', category: 'security', logo: 'surfshark.com' },
   'protonvpn.com':     { name: 'ProtonVPN', category: 'security', logo: 'protonvpn.com' },
   'proton.me':         { name: 'Proton', category: 'security', logo: 'proton.me' },
+  'protonmail.com':    { name: 'Proton Mail', category: 'security', logo: 'proton.me' },
   '1password.com':     { name: '1Password', category: 'security', logo: '1password.com' },
   'lastpass.com':      { name: 'LastPass', category: 'security', logo: 'lastpass.com' },
   'bitwarden.com':     { name: 'Bitwarden', category: 'security', logo: 'bitwarden.com' },
@@ -197,6 +376,18 @@ const KNOWN_SUBSCRIPTIONS = {
   'windscribe.com':    { name: 'Windscribe', category: 'security', logo: 'windscribe.com' },
   'nordpass.com':      { name: 'NordPass', category: 'security', logo: 'nordpass.com' },
   'keepersecurity.com': { name: 'Keeper', category: 'security', logo: 'keepersecurity.com' },
+  'malwarebytes.com':  { name: 'Malwarebytes', category: 'security', logo: 'malwarebytes.com' },
+  'bitdefender.com':   { name: 'Bitdefender', category: 'security', logo: 'bitdefender.com' },
+  'norton.com':        { name: 'Norton', category: 'security', logo: 'norton.com' },
+  'mcafee.com':        { name: 'McAfee', category: 'security', logo: 'mcafee.com' },
+  'kaspersky.com':     { name: 'Kaspersky', category: 'security', logo: 'kaspersky.com' },
+  'eset.com':          { name: 'ESET', category: 'security', logo: 'eset.com' },
+  'avast.com':         { name: 'Avast', category: 'security', logo: 'avast.com' },
+  'avg.com':           { name: 'AVG', category: 'security', logo: 'avg.com' },
+  'hidemyass.com':     { name: 'HideMyAss VPN', category: 'security', logo: 'hidemyass.com' },
+  'ipvanish.com':      { name: 'IPVanish', category: 'security', logo: 'ipvanish.com' },
+  'hotspotshield.com': { name: 'Hotspot Shield', category: 'security', logo: 'hotspotshield.com' },
+  'tunnelbear.com':    { name: 'TunnelBear', category: 'security', logo: 'tunnelbear.com' },
 
   // ── Education & Learning ──
   'duolingo.com':      { name: 'Duolingo Plus', category: 'education', logo: 'duolingo.com' },
@@ -213,6 +404,17 @@ const KNOWN_SUBSCRIPTIONS = {
   'babbel.com':        { name: 'Babbel', category: 'education', logo: 'babbel.com' },
   'rosettastone.com':  { name: 'Rosetta Stone', category: 'education', logo: 'rosettastone.com' },
   'wondrium.com':      { name: 'Wondrium', category: 'education', logo: 'wondrium.com' },
+  'pimsleur.com':      { name: 'Pimsleur', category: 'education', logo: 'pimsleur.com' },
+  'busuu.com':         { name: 'Busuu', category: 'education', logo: 'busuu.com' },
+  'italki.com':        { name: 'italki', category: 'education', logo: 'italki.com' },
+  'chegg.com':         { name: 'Chegg Study', category: 'education', logo: 'chegg.com' },
+  'khanacademy.org':   { name: 'Khan Academy', category: 'education', logo: 'khanacademy.org' },
+  'edx.org':           { name: 'edX', category: 'education', logo: 'edx.org' },
+  'udacity.com':       { name: 'Udacity', category: 'education', logo: 'udacity.com' },
+  'frontendmasters.com': { name: 'Frontend Masters', category: 'education', logo: 'frontendmasters.com' },
+  'egghead.io':        { name: 'egghead', category: 'education', logo: 'egghead.io' },
+  'leveluptutorials.com': { name: 'Level Up Tutorials', category: 'education', logo: 'leveluptutorials.com' },
+  'scrimba.com':       { name: 'Scrimba', category: 'education', logo: 'scrimba.com' },
 
   // ── Health & Fitness ──
   'headspace.com':     { name: 'Headspace', category: 'health', logo: 'headspace.com' },
@@ -228,6 +430,17 @@ const KNOWN_SUBSCRIPTIONS = {
   'ouraring.com':      { name: 'Oura Ring', category: 'health', logo: 'ouraring.com' },
   'flo.health':        { name: 'Flo', category: 'health', logo: 'flo.health' },
   'betterhelp.com':    { name: 'BetterHelp', category: 'health', logo: 'betterhelp.com' },
+  'talkspace.com':     { name: 'Talkspace', category: 'health', logo: 'talkspace.com' },
+  'teladoc.com':       { name: 'Teladoc', category: 'health', logo: 'teladoc.com' },
+  'hims.com':          { name: 'Hims', category: 'health', logo: 'hims.com' },
+  'ro.co':             { name: 'Ro', category: 'health', logo: 'ro.co' },
+  'nike.com':          { name: 'Nike Training Club', category: 'health', logo: 'nike.com' },
+  'trainwithpivot.com': { name: 'Pivot', category: 'health', logo: 'trainwithpivot.com' },
+  'future.co':         { name: 'Future', category: 'health', logo: 'future.co' },
+  'withings.com':      { name: 'Withings', category: 'health', logo: 'withings.com' },
+  'eightsleep.com':    { name: 'Eight Sleep', category: 'health', logo: 'eightsleep.com' },
+  'sleepfoundation.org': { name: 'Sleep Foundation', category: 'health', logo: 'sleepfoundation.org' },
+  'rise.science':      { name: 'Rise', category: 'health', logo: 'risescience.com' },
 
   // ── News & Media ──
   'medium.com':        { name: 'Medium', category: 'news', logo: 'medium.com' },
@@ -244,6 +457,17 @@ const KNOWN_SUBSCRIPTIONS = {
   'stratechery.com':   { name: 'Stratechery', category: 'news', logo: 'stratechery.com' },
   'theglobeandmail.com': { name: 'Globe and Mail', category: 'news', logo: 'theglobeandmail.com' },
   'thestar.com':       { name: 'Toronto Star', category: 'news', logo: 'thestar.com' },
+  'theatlantic.com':   { name: 'The Atlantic', category: 'news', logo: 'theatlantic.com' },
+  'newyorker.com':     { name: 'The New Yorker', category: 'news', logo: 'newyorker.com' },
+  'vanityfair.com':    { name: 'Vanity Fair', category: 'news', logo: 'vanityfair.com' },
+  'nymag.com':         { name: 'New York Magazine', category: 'news', logo: 'nymag.com' },
+  'technologyreview.com': { name: 'MIT Technology Review', category: 'news', logo: 'technologyreview.com' },
+  'hbr.org':           { name: 'Harvard Business Review', category: 'news', logo: 'hbr.org' },
+  'foreignpolicy.com': { name: 'Foreign Policy', category: 'news', logo: 'foreignpolicy.com' },
+  'axios.com':         { name: 'Axios Pro', category: 'news', logo: 'axios.com' },
+  'politico.com':      { name: 'Politico Pro', category: 'news', logo: 'politico.com' },
+  'theintercept.com':  { name: 'The Intercept', category: 'news', logo: 'theintercept.com' },
+  'nationalgeographic.com': { name: 'National Geographic', category: 'news', logo: 'nationalgeographic.com' },
 
   // ── Communication & Social ──
   'discord.com':       { name: 'Discord Nitro', category: 'social', logo: 'discord.com' },
@@ -255,8 +479,15 @@ const KNOWN_SUBSCRIPTIONS = {
   'redditmail.com':    { name: 'Reddit Premium', category: 'social', logo: 'reddit.com' },
   'patreon.com':       { name: 'Patreon', category: 'social', logo: 'patreon.com' },
   'buymeacoffee.com':  { name: 'Buy Me a Coffee', category: 'social', logo: 'buymeacoffee.com' },
+  'ko-fi.com':         { name: 'Ko-fi', category: 'social', logo: 'ko-fi.com' },
   'beehiiv.com':       { name: 'Beehiiv', category: 'social', logo: 'beehiiv.com' },
   'convertkit.com':    { name: 'ConvertKit', category: 'social', logo: 'convertkit.com' },
+  'kit.com':           { name: 'Kit (ConvertKit)', category: 'social', logo: 'convertkit.com' },
+  'gumroad.com':       { name: 'Gumroad', category: 'social', logo: 'gumroad.com' },
+  'memberful.com':     { name: 'Memberful', category: 'social', logo: 'memberful.com' },
+  'circle.so':         { name: 'Circle', category: 'social', logo: 'circle.so' },
+  'mighty.com':        { name: 'Mighty Networks', category: 'social', logo: 'mightynetworks.com' },
+  'mightynetworks.com': { name: 'Mighty Networks', category: 'social', logo: 'mightynetworks.com' },
 
   // ── Domain & Hosting ──
   'namecheap.com':     { name: 'Namecheap', category: 'hosting', logo: 'namecheap.com' },
@@ -266,6 +497,84 @@ const KNOWN_SUBSCRIPTIONS = {
   'wordpress.com':     { name: 'WordPress.com', category: 'hosting', logo: 'wordpress.com' },
   'shopify.com':       { name: 'Shopify', category: 'hosting', logo: 'shopify.com' },
   'ghost.org':         { name: 'Ghost', category: 'hosting', logo: 'ghost.org' },
+  'hostinger.com':     { name: 'Hostinger', category: 'hosting', logo: 'hostinger.com' },
+  'bluehost.com':      { name: 'Bluehost', category: 'hosting', logo: 'bluehost.com' },
+  'siteground.com':    { name: 'SiteGround', category: 'hosting', logo: 'siteground.com' },
+  'wpengine.com':      { name: 'WP Engine', category: 'hosting', logo: 'wpengine.com' },
+  'kinsta.com':        { name: 'Kinsta', category: 'hosting', logo: 'kinsta.com' },
+  'cloudways.com':     { name: 'Cloudways', category: 'hosting', logo: 'cloudways.com' },
+  'ionos.com':         { name: 'IONOS', category: 'hosting', logo: 'ionos.com' },
+  'hover.com':         { name: 'Hover', category: 'hosting', logo: 'hover.com' },
+  'porkbun.com':       { name: 'Porkbun', category: 'hosting', logo: 'porkbun.com' },
+  'domain.com':        { name: 'Domain.com', category: 'hosting', logo: 'domain.com' },
+  'register.com':      { name: 'Register.com', category: 'hosting', logo: 'register.com' },
+  'name.com':          { name: 'Name.com', category: 'hosting', logo: 'name.com' },
+  'dynadot.com':       { name: 'Dynadot', category: 'hosting', logo: 'dynadot.com' },
+
+  // ── CRM & Sales ──
+  'salesforce.com':    { name: 'Salesforce', category: 'productivity', logo: 'salesforce.com' },
+  'hubspot.com':       { name: 'HubSpot', category: 'productivity', logo: 'hubspot.com' },
+  'pipedrive.com':     { name: 'Pipedrive', category: 'productivity', logo: 'pipedrive.com' },
+  'close.com':         { name: 'Close CRM', category: 'productivity', logo: 'close.com' },
+  'apollo.io':         { name: 'Apollo', category: 'productivity', logo: 'apollo.io' },
+  'outreach.io':       { name: 'Outreach', category: 'productivity', logo: 'outreach.io' },
+  'salesloft.com':     { name: 'Salesloft', category: 'productivity', logo: 'salesloft.com' },
+  'gong.io':           { name: 'Gong', category: 'productivity', logo: 'gong.io' },
+  'freshworks.com':    { name: 'Freshworks', category: 'productivity', logo: 'freshworks.com' },
+  'freshdesk.com':     { name: 'Freshdesk', category: 'productivity', logo: 'freshdesk.com' },
+  'zendesk.com':       { name: 'Zendesk', category: 'productivity', logo: 'zendesk.com' },
+  'intercom.com':      { name: 'Intercom', category: 'productivity', logo: 'intercom.com' },
+  'intercom.io':       { name: 'Intercom', category: 'productivity', logo: 'intercom.com' },
+  'drift.com':         { name: 'Drift', category: 'productivity', logo: 'drift.com' },
+  'crisp.chat':        { name: 'Crisp', category: 'productivity', logo: 'crisp.chat' },
+  'helpscout.com':     { name: 'Help Scout', category: 'productivity', logo: 'helpscout.com' },
+
+  // ── Marketing & Email ──
+  'mailchimp.com':     { name: 'Mailchimp', category: 'productivity', logo: 'mailchimp.com' },
+  'activecampaign.com': { name: 'ActiveCampaign', category: 'productivity', logo: 'activecampaign.com' },
+  'klaviyo.com':       { name: 'Klaviyo', category: 'productivity', logo: 'klaviyo.com' },
+  'constantcontact.com': { name: 'Constant Contact', category: 'productivity', logo: 'constantcontact.com' },
+  'campaignmonitor.com': { name: 'Campaign Monitor', category: 'productivity', logo: 'campaignmonitor.com' },
+  'hootsuite.com':     { name: 'Hootsuite', category: 'productivity', logo: 'hootsuite.com' },
+  'buffer.com':        { name: 'Buffer', category: 'productivity', logo: 'buffer.com' },
+  'sproutsocial.com':  { name: 'Sprout Social', category: 'productivity', logo: 'sproutsocial.com' },
+  'later.com':         { name: 'Later', category: 'productivity', logo: 'later.com' },
+  'socialbee.io':      { name: 'SocialBee', category: 'productivity', logo: 'socialbee.io' },
+  'semrush.com':       { name: 'Semrush', category: 'productivity', logo: 'semrush.com' },
+  'ahrefs.com':        { name: 'Ahrefs', category: 'productivity', logo: 'ahrefs.com' },
+  'moz.com':           { name: 'Moz Pro', category: 'productivity', logo: 'moz.com' },
+
+  // ── Finance & Accounting ──
+  'quickbooks.intuit.com': { name: 'QuickBooks', category: 'productivity', logo: 'quickbooks.intuit.com' },
+  'intuit.com':        { name: 'Intuit', category: 'productivity', logo: 'intuit.com' },
+  'freshbooks.com':    { name: 'FreshBooks', category: 'productivity', logo: 'freshbooks.com' },
+  'wave.com':          { name: 'Wave', category: 'productivity', logo: 'waveapps.com' },
+  'xero.com':          { name: 'Xero', category: 'productivity', logo: 'xero.com' },
+  'gusto.com':         { name: 'Gusto', category: 'productivity', logo: 'gusto.com' },
+  'rippling.com':      { name: 'Rippling', category: 'productivity', logo: 'rippling.com' },
+  'deel.com':          { name: 'Deel', category: 'productivity', logo: 'deel.com' },
+  'remote.com':        { name: 'Remote', category: 'productivity', logo: 'remote.com' },
+  'bench.co':          { name: 'Bench', category: 'productivity', logo: 'bench.co' },
+  'taxjar.com':        { name: 'TaxJar', category: 'productivity', logo: 'taxjar.com' },
+  'avalara.com':       { name: 'Avalara', category: 'productivity', logo: 'avalara.com' },
+
+  // ── E-commerce ──
+  'bigcommerce.com':   { name: 'BigCommerce', category: 'hosting', logo: 'bigcommerce.com' },
+  'teachable.com':     { name: 'Teachable', category: 'education', logo: 'teachable.com' },
+  'thinkific.com':     { name: 'Thinkific', category: 'education', logo: 'thinkific.com' },
+  'kajabi.com':        { name: 'Kajabi', category: 'education', logo: 'kajabi.com' },
+  'podia.com':         { name: 'Podia', category: 'education', logo: 'podia.com' },
+
+  // ── Legal & Document ──
+  'docusign.com':      { name: 'DocuSign', category: 'productivity', logo: 'docusign.com' },
+  'pandadoc.com':      { name: 'PandaDoc', category: 'productivity', logo: 'pandadoc.com' },
+  'hellosign.com':     { name: 'HelloSign (Dropbox Sign)', category: 'productivity', logo: 'hellosign.com' },
+  'dropboxsign.com':   { name: 'Dropbox Sign', category: 'productivity', logo: 'dropboxsign.com' },
+  'signnow.com':       { name: 'signNow', category: 'productivity', logo: 'signnow.com' },
+  'adobe-sign.com':    { name: 'Adobe Sign', category: 'productivity', logo: 'adobe.com' },
+  'contractbook.com':  { name: 'Contractbook', category: 'productivity', logo: 'contractbook.com' },
+  'clerky.com':        { name: 'Clerky', category: 'productivity', logo: 'clerky.com' },
+  'legalzoom.com':     { name: 'LegalZoom', category: 'productivity', logo: 'legalzoom.com' },
 }
 
 // ── Multi-product domains: need subject keyword to identify specific service ──
@@ -439,67 +748,127 @@ function extractPlatformSubName(domain, from, subject, bodyText) {
 }
 
 // ─── BLOCKLIST: Non-subscription recurring senders ───
+// All entries are EXACT domain strings — matched against the candidate domain directly.
 const BLOCKLIST = [
-  // Telecom / ISPs / Utilities
+  // ── Canadian Telecom / ISPs ──
   'bell.ca', 'bell.net', 'rogers.com', 'telus.com', 'fido.ca', 'koodo.com',
-  'virginmobile', 'virginplus', 'shaw.ca', 'att.com', 'att.net', 'verizon.com',
-  'tmobile.com', 't-mobile.com', 'comcast.com', 'xfinity.com', 'spectrum.com',
-  'hydroone', 'enbridge', 'fortisbc', 'bchydro', 'torontohydro', 'alectra',
-  'puc.on.ca', 'hydroottawa', 'epcor.com', 'bge.com', 'coned.com', 'pge.com',
-  'sce.com', 'duke-energy', 'nationalgrid', 'dominion', 'firstenergy',
-  // Water utilities
-  'toronto.ca', 'peelregion', 'york.ca', 'halton.ca', 'durham.ca',
-  'regionofwaterloo', 'cityofhamilton', 'cityofottawa', 'cityofvancouver',
-  // Insurance
-  'equitable', 'sunlife', 'manulife', 'greatwest', 'desjardins',
-  'statefarm', 'allstate', 'geico', 'progressive.com',
-  'intact.net', 'cooperators', 'aviva.ca', 'td insurance',
-  // Retailers / Shopping / Fashion
-  'bestbuy', 'walmart', 'costco', 'target.com', 'ikea',
-  'homedepot', 'lowes', 'staples', 'winners', 'marshalls',
-  'aritzia', 'zara.com', 'hm.com', 'uniqlo', 'gap.com', 'oldnavy',
-  'lululemon', 'oakandfort', 'oak+fort', 'sephora', 'ulta', 'nordstrom',
-  'shein', 'fashionnova', 'ssense', 'farfetch', 'abercrombie',
-  'arcteryx', 'arc\'teryx', 'ralphlauren', 'polo', 'alexanderwang',
-  'urbanoutfitters', 'anthropologie', 'freepeople', 'jcrew', 'macys',
-  'bloomingdales', 'saksfifth', 'neimanmarcus', 'coach.com', 'gucci',
-  'prada', 'louisvuitton', 'lvmh', 'burberry', 'balenciaga', 'dior',
-  'chanel.com', 'hermes.com', 'tiffany', 'cartier', 'rolex',
-  'ladym', 'lady m', 'petsmart', 'petco', 'chewy.com',
-  'indigo.ca', 'chapters.ca', 'bookdepository', 'bookroom',
-  'asiabookroom', 'abebooks', 'thriftbooks',
-  // Transportation / Airlines / Car
+  'virginmobile.ca', 'virginplus.ca', 'shaw.ca', 'eastlink.ca', 'videotron.ca',
+  // ── US Telecom / ISPs ──
+  'att.com', 'att.net', 'verizon.com', 'tmobile.com', 't-mobile.com',
+  'comcast.com', 'xfinity.com', 'spectrum.com', 'cricketwireless.com',
+  'boostmobile.com', 'metropcs.com', 'uscellular.com', 'centurylink.com',
+  'lumen.com', 'frontier.com', 'earthlink.com', 'optimum.com',
+  'cablevision.com', 'cox.com', 'mediacom.com', 'windstream.com',
+  // ── Canadian Utilities ──
+  'hydroone.com', 'enbridge.com', 'fortisbc.com', 'bchydro.com',
+  'torontohydro.com', 'alectra.ca', 'puc.on.ca', 'hydroottawa.com',
+  'epcor.com', 'atco.com', 'saskpower.com', 'manitobahydro.com',
+  'nbpower.com', 'nspower.ca', 'nfhydro.ca', 'uniongas.com',
+  // ── US Utilities ──
+  'bge.com', 'coned.com', 'pge.com', 'sce.com', 'sdge.com',
+  'duke-energy.com', 'nationalgrid.com', 'dominionenergy.com',
+  'firstenergy.com', 'aep.com', 'exeloncorp.com', 'pplinc.com',
+  'entergy.com', 'dte.com', 'consumersenergy.com', 'nicor.com',
+  'nstar.com', 'eversource.com', 'unitil.com', 'avangrid.com',
+  'southernco.com', 'georgia-power.com', 'alabama-power.com',
+  'fpl.com', 'duke-florida.com', 'teco.net', 'nvenergy.com',
+  'pacificorp.com', 'puget.com', 'swepco.com', 'columbia-gas.com',
+  // ── Canadian Water / Municipal ──
+  'toronto.ca', 'peelregion.ca', 'york.ca', 'halton.ca', 'durham.ca',
+  'regionofwaterloo.ca', 'hamilton.ca', 'ottawa.ca', 'vancouver.ca',
+  'calgary.ca', 'edmonton.ca', 'winnipeg.ca',
+  // ── Insurance (Canada) ──
+  'equitable.ca', 'sunlife.com', 'manulife.com', 'greatwestlife.com',
+  'desjardins.com', 'intact.net', 'cooperators.ca', 'aviva.ca',
+  'economical.com', 'wawanesa.com', 'squareone.ca',
+  // ── Insurance (US) ──
+  'statefarm.com', 'allstate.com', 'geico.com', 'progressive.com',
+  'libertymutual.com', 'nationwide.com', 'travelers.com', 'usaa.com',
+  'amica.com', 'erieinsurance.com', 'farmers.com', 'metlife.com',
+  'nylim.com', 'newyorklife.com', 'transamerica.com', 'guardian.com',
+  'cigna.com', 'aetna.com', 'anthem.com', 'uhc.com', 'humana.com',
+  'kaiserpermanente.org', 'bluecrossca.com', 'bcbs.com',
+  // ── Retailers / Shopping / Fashion ──
+  'bestbuy.com', 'bestbuy.ca', 'walmart.com', 'walmart.ca',
+  'costco.com', 'costco.ca', 'target.com', 'ikea.com', 'ikea.ca',
+  'homedepot.com', 'homedepot.ca', 'lowes.com', 'staples.com', 'staples.ca',
+  'winners.ca', 'marshalls.com', 'tjmaxx.com', 'aritzia.com',
+  'zara.com', 'hm.com', 'uniqlo.com', 'gap.com', 'oldnavy.com',
+  'lululemon.com', 'sephora.com', 'ulta.com', 'nordstrom.com',
+  'shein.com', 'ssense.com', 'farfetch.com', 'abercrombie.com',
+  'ae.com', 'hollister.com', 'forever21.com', 'express.com',
+  'ralphlauren.com', 'alexanderwang.com', 'urbanoutfitters.com',
+  'anthropologie.com', 'freepeople.com', 'jcrew.com', 'jcrewfactory.com',
+  'macys.com', 'bloomingdales.com', 'saksfifthavenue.com', 'neimanmarcus.com',
+  'coach.com', 'gucci.com', 'prada.com', 'louisvuitton.com',
+  'burberry.com', 'balenciaga.com', 'dior.com', 'chanel.com',
+  'hermes.com', 'tiffany.com', 'cartier.com', 'rolex.com',
+  'petsmart.com', 'petco.com', 'chewy.com',
+  'indigo.ca', 'chapters.ca', 'barnesandnoble.com', 'abebooks.com', 'thriftbooks.com',
+  'kroger.com', 'safeway.com', 'albertsons.com', 'publix.com',
+  'wholefoods.com', 'traderjoes.com', 'aldi.com', 'lidl.com',
+  'cvs.com', 'walgreens.com', 'riteaid.com', 'duanereade.com',
+  'dollartree.com', 'dollargeneral.com', 'familydollar.com',
+  'autozone.com', 'oreillyauto.com', 'advanceautoparts.com',
+  'bedbathandbeyond.com', 'crateandbarrel.com', 'cb2.com',
+  'williams-sonoma.com', 'potterybarn.com', 'westelm.com',
+  'wayfair.com', 'overstock.com', 'hayneedle.com', 'jossandmain.com',
+  'rei.com', 'mec.ca', 'cabelas.com', 'basspro.com', 'dickssportinggoods.com',
+  // ── Transportation / Airlines / Car ──
   'uber.com', 'lyft.com', 'turo.com', 'enterprise.com', 'hertz.com',
-  '407etr', '407 etr', 'presto', 'transit', 'compass card',
-  'aircanada', 'air canada', 'westjet', 'united.com', 'delta.com',
-  'americanairlines', 'southwest', 'alaskaair', 'jetblue',
-  'expedia.com', 'kayak.com', 'skyscanner', 'hopper.com',
-  'flighthub', 'google flights',
-  // Food / Restaurant / Delivery
-  'doordash', 'ubereats', 'skipthedishes', 'grubhub', 'instacart',
-  'hellofresh', 'goodfood', 'chefplate', 'freshprep',
-  'starbucks', 'timhortons', 'mcdonalds', 'subway', 'dominos',
-  // Banks / Finance
-  'paypal.com', 'venmo.com', 'interac', 'scotiabank', 'tdbank', 'td.com',
-  'rbc.com', 'rbcroyalbank', 'bmo.com', 'cibc.com',
-  'americanexpress', 'chase.com', 'capitalone',
-  'pcfinancial', 'simplii', 'tangerine', 'eq bank', 'wealthsimple',
-  'questrade', 'interactive brokers',
-  // Government
-  'cra-arc', 'canada.ca', 'irs.gov', 'servicecanada', 'serviceontario',
-  // Shipping
-  'fedex.com', 'ups.com', 'usps.com', 'canadapost', 'dhl.com', 'purolator',
-  // Travel / Hotels
-  'airbnb.com', 'booking.com', 'expedia.com', 'hotels.com',
-  'marriott', 'hilton', 'hyatt', 'ihg', 'bestwestern',
-  'vrbo', 'tripadvisor',
-  // Physical services (not SaaS)
-  'accessstorage', 'storagemart', 'publicstore',
-  // Real estate
-  'zillow', 'realtor.com', 'redfin',
-  // Education institutions (not SaaS)
-  'brainstation', 'generalassemb', 'bootcamp', 'university', 'college',
-  // Gmail itself
+  'avis.com', 'budget.com', 'zipcar.com',
+  '407etr.com', 'prestocard.ca', 'compasscard.ca',
+  'aircanada.com', 'westjet.com', 'united.com', 'delta.com',
+  'aa.com', 'southwest.com', 'alaskaair.com', 'jetblue.com',
+  'spirit.com', 'frontier.com', 'sunwing.ca', 'flair.ca',
+  'expedia.com', 'kayak.com', 'skyscanner.com', 'hopper.com',
+  // ── Food / Restaurant / Delivery ──
+  'doordash.com', 'ubereats.com', 'skipthedishes.com', 'grubhub.com',
+  'seamless.com', 'postmates.com', 'instacart.com',
+  'hellofresh.com', 'goodfood.ca', 'chefplate.ca', 'freshprep.ca',
+  'starbucks.com', 'timhortons.com', 'mcdonalds.com', 'subway.com',
+  'dominos.com', 'pizzahut.com', 'papajohns.com', 'tacobell.com',
+  'chipotle.com', 'shakeshack.com', 'chick-fil-a.com',
+  // ── Banks / Finance (Canada) ──
+  'scotiabank.com', 'td.com', 'tdbank.com', 'rbc.com', 'rbcroyalbank.com',
+  'bmo.com', 'cibc.com', 'pcfinancial.ca', 'simplii.com',
+  'tangerine.ca', 'eqbank.ca', 'wealthsimple.com', 'questrade.com',
+  'interac.ca',
+  // ── Banks / Finance (US) ──
+  'paypal.com', 'venmo.com', 'wellsfargo.com', 'usbank.com',
+  'pnc.com', 'chase.com', 'bankofamerica.com', 'capitalone.com',
+  'citi.com', 'citibank.com', 'tdbank.com', 'suntrust.com',
+  'regions.com', 'fifththird.com', 'keycorp.com', 'huntington.com',
+  'ally.com', 'discover.com', 'synchrony.com', 'americanexpress.com',
+  'navyfederal.org', 'usaa.com', 'schwab.com', 'fidelity.com',
+  'vanguard.com', 'interactivebrokers.com', 'robinhood.com',
+  // ── Government (Canada) ──
+  'cra-arc.gc.ca', 'canada.ca', 'servicecanada.gc.ca', 'serviceontario.ca',
+  'icbc.com',
+  // ── Government (US) ──
+  'irs.gov', 'ssa.gov', 'medicare.gov', 'va.gov', 'usps.com',
+  'state.gov', 'treasury.gov', 'dol.gov', 'hud.gov',
+  // ── Transit ──
+  'mta.info', 'wmata.com', 'bart.gov', 'transitchicago.com',
+  'seattletransit.org', 'trimet.org', 'mbta.com', 'sfmta.com',
+  'metro.net', 'rideuta.com', 'valleymetro.org',
+  // ── Shipping ──
+  'fedex.com', 'ups.com', 'canadapost.ca', 'dhl.com', 'purolator.com',
+  // ── Travel / Hotels ──
+  'airbnb.com', 'booking.com', 'hotels.com', 'vrbo.com', 'tripadvisor.com',
+  'marriott.com', 'hilton.com', 'hyatt.com', 'ihg.com', 'bestwestern.com',
+  'choicehotels.com', 'wyndham.com', 'accor.com',
+  // ── Healthcare ──
+  'unitedhealthcare.com', 'anthem.com', 'aetna.com', 'cignaforhcp.com',
+  'humana.com', 'cvs.com', 'walgreens.com', 'labcorp.com', 'questdiagnostics.com',
+  // ── Physical services (not SaaS) ──
+  'accessstorage.com', 'storagemart.com', 'publicstorage.com',
+  'extraspace.com', 'cubesmart.com', 'lifestorage.com',
+  // ── Real estate ──
+  'zillow.com', 'realtor.com', 'redfin.com', 'trulia.com', 'zumper.com',
+  // ── Education institutions (not SaaS) ──
+  'brainstation.io', 'generalassemb.ly', 'trilogy.com',
+  // ── Gmail itself ──
   'gmail.com',
 ]
 
@@ -515,6 +884,8 @@ const STRONG_SUBSCRIPTION_KEYWORDS = [
   'your plan', 'plan renewal', 'auto renewing', 'subscription renewed',
   'subscriber', 'renews on', 'next billing', 'premium member',
   'pro plan', 'team plan', 'business plan', 'starter plan',
+  // Payment keywords aligned with Phase 1 search terms
+  'receipt', 'invoice', 'payment', 'charged', 'billing', 'paid',
   '订阅', '会员', '续费', '自动续费', '连续包月', '连续包年',
 ]
 
@@ -747,12 +1118,12 @@ function findKnownServiceByName(serviceName) {
  * Check if domain is blocklisted
  */
 function isBlocklisted(domain, from, subject) {
-  const fromLower = from.toLowerCase()
-  const subjectLower = subject.toLowerCase()
+  // Exact domain match — check if candidate domain equals a blocklist entry
+  // or is a subdomain of a blocklist entry (e.g. "mail.rogers.com" → blocked by "rogers.com")
+  const blocklistSet = new Set(BLOCKLIST)
+  if (blocklistSet.has(domain)) return true
   for (const blocked of BLOCKLIST) {
-    if (domain.includes(blocked) || fromLower.includes(blocked) || subjectLower.includes(blocked)) {
-      return true
-    }
+    if (domain.endsWith('.' + blocked)) return true
   }
   return false
 }
@@ -1641,7 +2012,11 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
     'OR "your subscription" OR "plan renewal" OR "welcome to your"',
     'OR "paid subscription" OR "order receipt" OR "your plan"',
     'OR "subscription renewal" OR "renew" OR "auto-renewal"',
-    'OR 收据 OR 发票 OR 账单 OR 订阅 OR 会员))',
+    'OR "free trial" OR "trial started" OR "trial ending" OR "trial expires"',
+    'OR "trial period" OR "trial will end" OR "days left in trial"',
+    'OR "payment processed" OR "charge notification" OR "payment due"',
+    'OR "card charged" OR "card ending in" OR "thanks for your payment"',
+    'OR 收据 OR 发票 OR 账单 OR 订阅 OR 会员 OR 免费试用 OR 试用期))',
     `newer_than:${months}m`,
     '-category:promotions',
     '-category:social',
@@ -1748,6 +2123,7 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
   if (onProgress) onProgress({ phase: 3, message: 'Detecting subscription patterns...', current: 0, total: domainCount })
 
   const passedDomains = []
+  const unknownNeedsPreJudge = [] // domains with no strong keywords → lightweight AI check
 
   let analyzed = 0
   for (const [domain, emails] of Object.entries(senderGroups)) {
@@ -1778,7 +2154,6 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
     } else if (!isKnown && emails.length >= 1) {
       // UNKNOWN brands: only pass if emails have STRONG subscription signals.
       // Generic "receipt"/"invoice" are NOT enough — shopping receipts have those too.
-      // Must contain explicit subscription/recurring keywords to avoid false positives.
       const hasStrong = emails.some(e => hasStrongSubscriptionEvidence(e.subject))
       if (hasStrong) {
         passedDomains.push({
@@ -1787,6 +2162,14 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
           frequency: freq.isRecurring ? freq : { isRecurring: false, confidence: 'low', cycle: freq.cycle, intervalDays: freq.intervalDays },
           isKnown: false,
           _unknownWithBilling: true, // flag for Phase 4 to put in needsReview
+        })
+      } else {
+        // No strong keywords — queue for lightweight AI pre-judgment (subjects only)
+        unknownNeedsPreJudge.push({
+          domain,
+          emails,
+          frequency: freq,
+          subjects: emails.map(e => e.subject).filter(Boolean),
         })
       }
     }
@@ -1799,6 +2182,25 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
     })
   }
 
+  // ── AI pre-judgment for unknowns with no strong keywords ──
+  if (unknownNeedsPreJudge.length > 0) {
+    if (onProgress) onProgress({ phase: 3, message: `Pre-judging ${unknownNeedsPreJudge.length} unknown senders with AI...`, current: analyzed, total: domainCount })
+    const preJudgePassed = await preJudgeUnknownServices(
+      unknownNeedsPreJudge.map(({ domain, subjects }) => ({ domain, subjects }))
+    )
+    for (const { domain, emails, frequency } of unknownNeedsPreJudge) {
+      if (preJudgePassed.has(domain)) {
+        passedDomains.push({
+          domain,
+          emails,
+          frequency: frequency.isRecurring ? frequency : { isRecurring: false, confidence: 'low', cycle: frequency.cycle, intervalDays: frequency.intervalDays },
+          isKnown: false,
+          _unknownWithBilling: true,
+        })
+      }
+    }
+  }
+
   if (passedDomains.length === 0) {
     return { confirmed: [], needsReview: [] }
   }
@@ -1807,9 +2209,10 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
   // PHASE 4: Fetch email bodies + AI analysis
   // ════════════════════════════════════════════════
   // For each candidate domain:
-  // 1. Fetch up to 3 recent email bodies (for richer AI context)
-  // 2. Build regex-based fallback data (name, price, cycle)
-  // 3. Send to Claude AI for final determination
+  // 1. Fetch up to MAX_EMAILS_TO_FETCH email bodies (metadata scan for relevance)
+  // 2. Select the MAX_EMAILS_TO_AI most relevant ones (by subject keywords) for full AI analysis
+  // 3. Build regex-based fallback data (name, price, cycle)
+  // 4. Send to Claude AI for final determination
   //
   // AI is the PRIMARY judge — it decides if something is a subscription,
   // extracts the correct name/amount/cycle, detects cancellations,
@@ -1817,7 +2220,11 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
   if (onProgress) onProgress({ phase: 4, message: 'Reading emails...', current: 0, total: passedDomains.length })
 
   const aiCandidates = [] // will be sent to AI
-  const MAX_EMAILS_TO_AI = 3 // send up to 3 emails per candidate for context
+  const MAX_EMAILS_TO_FETCH = 15 // fetch up to 15 emails metadata for relevance scoring
+  const MAX_EMAILS_TO_AI = 5 // send up to 5 most relevant emails to AI for full body analysis
+
+  // Subjects that indicate high-value billing emails (prioritized for AI)
+  const RELEVANT_SUBJECT_KEYWORDS = ['receipt', 'invoice', 'payment', 'billing', 'charge', 'charged', 'paid', 'renewal', 'renewed']
 
   for (let i = 0; i < passedDomains.length; i++) {
     const { domain, emails, frequency, isKnown, _unknownWithBilling } = passedDomains[i]
@@ -1826,8 +2233,15 @@ export async function scanGmailForSubscriptions(token, onProgress, options = {})
     const newestEmail = sortedEmails[0]
     const lastEmailDate = newestEmail.date.toISOString()
 
-    // Fetch up to MAX_EMAILS_TO_AI email bodies for AI context
-    const emailsToFetch = sortedEmails.slice(0, MAX_EMAILS_TO_AI)
+    // Fetch up to MAX_EMAILS_TO_FETCH emails, then select the most relevant for AI
+    const emailPool = sortedEmails.slice(0, MAX_EMAILS_TO_FETCH)
+    // Sort by relevance: emails with billing subject keywords first, then by recency
+    const scoredEmails = emailPool.map(e => ({
+      email: e,
+      score: RELEVANT_SUBJECT_KEYWORDS.filter(kw => (e.subject || '').toLowerCase().includes(kw)).length,
+    }))
+    scoredEmails.sort((a, b) => b.score - a.score || 0) // stable: keep recency order for ties
+    const emailsToFetch = scoredEmails.slice(0, MAX_EMAILS_TO_AI).map(s => s.email)
     const emailDataList = [] // will hold {subject, bodyText, from, domain, date} for each
     let bodyText = '' // combined text for regex fallback
     let priceResult = null

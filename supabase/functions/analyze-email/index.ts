@@ -130,7 +130,7 @@ ALSO NOT SUBSCRIPTIONS:
 - Personal emails from individuals (not businesses)
 - Emails where you cannot determine what service is being charged
 
-## WHEN UNSURE: Default to isSubscription: false. It is MUCH better to miss a real subscription than to include something that isn't one. The user can always add missed subscriptions manually.
+## WHEN UNSURE: Use your best judgment based on all available evidence. If there is reasonable evidence of a recurring digital service charge, classify as subscription with confidence: medium. Only mark isSubscription: false when you are confident it is NOT a subscription (e.g., clearly a one-time purchase, physical goods, or non-digital service).
 
 ## SERVICE IDENTIFICATION
 - Identify the real service name, not the email sender domain
@@ -191,6 +191,7 @@ When website info and email content agree, you can be confident. When they confl
 ## STATUS DETECTION
 Analyze the newest BILLING email (not verification codes or marketing):
 - "active": Recent successful payment, renewal confirmation, or active plan notice
+- "trial": Free trial started, trial period active, trial ending soon, "days left in trial", "trial will end"
 - "cancelled": "cancelled", "cancellation confirmed", "subscription ended", "you won't be charged"
 - "payment_failed": "payment failed", "declined", "billing issue", "update payment method"
 - "expired": Trial ended without conversion, plan expired
@@ -214,7 +215,7 @@ Return ONLY valid JSON (no markdown, no backticks):
   "currency": "USD"/"CAD"/"CNY"/"EUR"/"GBP" etc or null,
   "billingCycle": "monthly"/"quarterly"/"yearly"/"weekly" or null,
   "nextBillingDate": "YYYY-MM-DD" or null,
-  "status": "active"/"cancelled"/"payment_failed"/"expired" or null,
+  "status": "active"/"trial"/"cancelled"/"payment_failed"/"expired" or null,
   "reason": "Brief explanation of why this is/isn't a subscription",
   "paymentHistory": [{"date": "YYYY-MM-DD", "amount": number, "currency": "USD"}] or []
 }`;

@@ -233,8 +233,8 @@ export async function analyzeWithAI(candidates, onProgress) {
       _aiStatus: aiStatus, // preserve original AI status for UI
     }
 
-    // High confidence known services → confirmed; everything else → review
-    if (candidate.isKnown && aiResult.confidence === 'high' && aiResult.isSubscription && aiStatus === 'active') {
+    // Known services OR AI high-confidence unknowns → confirmed; everything else → review
+    if ((candidate.isKnown || aiResult.confidence === 'high') && aiResult.isSubscription && aiStatus === 'active') {
       confirmed.push(subscription)
     } else {
       needsReview.push(subscription)

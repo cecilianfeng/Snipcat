@@ -86,8 +86,8 @@ export default function Terms() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Agreement to Terms</h2>
             <p>
-              These Terms of Service ("Terms") constitute a legally binding agreement between you and Xiyun Feng,
-              doing business as <strong>Snipcat</strong> ("Company," "we," "us," or "our"), governing your access
+              These Terms of Service ("Terms") constitute a legally binding agreement between you and <strong>Snipcat</strong>
+              ("Company," "we," "us," or "our"), governing your access
               to and use of the Snipcat website located at{' '}
               <a href="https://www.snipcat.app" className="text-[#F97316] hover:underline">https://www.snipcat.app</a>{' '}
               and its associated SaaS platform (collectively, the "Service").
@@ -170,7 +170,7 @@ export default function Terms() {
             <h2 className="text-xl font-semibold text-gray-900 mb-3">5. Intellectual Property</h2>
             <p>
               The Service and its original content, features, and functionality are and will remain the exclusive
-              property of Xiyun Feng (doing business as Snipcat) and its licensors. Our trademarks, service
+              property of Snipcat and its licensors. Our trademarks, service
               marks, logos, and trade names may not be used in connection with any product or service without our
               prior written consent.
             </p>
@@ -287,8 +287,7 @@ export default function Terms() {
             <h2 className="text-xl font-semibold text-gray-900 mb-3">13. Contact Information</h2>
             <p>If you have any questions about these Terms, please contact us:</p>
             <address className="mt-3 not-italic text-gray-600">
-              <strong>Xiyun Feng, doing business as Snipcat</strong><br />
-              Markham, Ontario, Canada<br />
+              <strong>Snipcat</strong><br />
               <a href="mailto:hellosnipcat@gmail.com" className="text-[#F97316] hover:underline">hellosnipcat@gmail.com</a>
             </address>
           </section>

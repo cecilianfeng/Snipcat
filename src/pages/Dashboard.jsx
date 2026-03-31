@@ -652,7 +652,6 @@ const Dashboard = () => {
       billing_cycle: 'monthly',
       next_billing_date: '',
       status: 'active',
-      notes: '',
     })
     const [saving, setSaving] = useState(false)
 
@@ -666,12 +665,11 @@ const Dashboard = () => {
           billing_cycle: editingSub.billing_cycle || 'monthly',
           next_billing_date: editingSub.next_billing_date || '',
           status: editingSub.status || 'active',
-          notes: editingSub.notes || '',
         })
       } else {
         setForm({
           name: '', category: 'other', amount: '', currency: 'USD',
-          billing_cycle: 'monthly', next_billing_date: '', status: 'active', notes: '',
+          billing_cycle: 'monthly', next_billing_date: '', status: 'active',
         })
       }
     }, [editingSub, isOpen])
@@ -809,18 +807,6 @@ const Dashboard = () => {
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label className="block text-sm font-medium text-[#6B7280] dark:text-gray-400 mb-1.5">Notes (optional)</label>
-              <textarea
-                rows={2}
-                placeholder="Any notes about this subscription..."
-                value={form.notes}
-                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-[#E5E7EB] dark:border-[#2A2D3A] dark:bg-[#252836] dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F97316] resize-none"
-              />
             </div>
 
             {/* Buttons */}
@@ -1184,7 +1170,7 @@ const Dashboard = () => {
 
         {/* Stats Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          <div className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200">
+          <div className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-[#6B7280] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">
@@ -1207,7 +1193,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200">
+          <div className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-[#6B7280] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">Active Subscriptions</p>
@@ -1219,7 +1205,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200">
+          <div className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-[#6B7280] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">Renewing Soon</p>
@@ -1231,7 +1217,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200">
+          <div className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-[#6B7280] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">
@@ -1283,7 +1269,6 @@ const Dashboard = () => {
               { key: 'all', label: 'All', count: counts.all },
               { key: 'active', label: 'Active', count: counts.active },
               ...(counts.pending > 0 ? [{ key: 'pending', label: 'Upcoming', count: counts.pending }] : []),
-              { key: 'paused', label: 'Paused', count: counts.paused },
               { key: 'cancelled', label: 'Cancelled', count: counts.cancelled },
             ].map(filter => (
               <button
@@ -1328,7 +1313,7 @@ const Dashboard = () => {
                   key={sub.id}
                   onMouseEnter={() => setHoveredId(sub.id)}
                   onMouseLeave={() => setHoveredId(null)}
-                  className={`bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] p-5 flex justify-between items-center transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 ${
+                  className={`bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] p-5 flex justify-between items-center ${
                     sub.status === 'cancelled' ? 'opacity-55' : ''
                   }`}
                 >
@@ -1408,14 +1393,6 @@ const Dashboard = () => {
 
                     <div className="min-w-32 flex items-center gap-2">
                       {getStatusBadge(sub.status)}
-                      {hoveredId === sub.id && sub.status === 'active' && (
-                        <button
-                          onClick={() => setCancelConfirm(sub)}
-                          className="text-xs text-[#EF4444]/70 dark:text-red-400/70 hover:text-[#EF4444] dark:hover:text-red-400 transition-colors whitespace-nowrap font-medium"
-                        >
-                          Cancel
-                        </button>
-                      )}
                       {hoveredId === sub.id && sub.status === 'cancelled' && (
                         <div className="flex gap-2">
                           <button

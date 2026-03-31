@@ -626,16 +626,12 @@ export default function Settings() {
           </div>
 
           {/* Delete Account */}
-          <div>
-            <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Delete Account</h3>
-            <p className="text-[#6B7280] dark:text-gray-400 mb-4">
-              Permanently delete your Snipcat account, all subscriptions, reminders, and preferences. This action cannot be undone.
-            </p>
+          <div className="pt-2">
             <button
               onClick={() => setShowDeleteModal(true)}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
+              className="text-sm text-[#9CA3AF] dark:text-gray-500 hover:text-[#6B7280] dark:hover:text-gray-400 underline transition-colors"
             >
-              Delete Account
+              Delete my account
             </button>
           </div>
 

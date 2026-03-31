@@ -6,7 +6,6 @@ import {
   getSubscriptions,
   createSubscription,
   updateSubscription,
-  deleteSubscription,
   CATEGORIES,
   groupByCategory,
   getMonthlyEquivalent,
@@ -24,7 +23,6 @@ function SubscriptionModal({ isOpen, onClose, onSave, editData }) {
     billing_cycle: 'monthly',
     next_billing_date: '',
     status: 'active',
-    notes: '',
   })
   const [saving, setSaving] = useState(false)
 
@@ -38,12 +36,11 @@ function SubscriptionModal({ isOpen, onClose, onSave, editData }) {
         billing_cycle: editData.billing_cycle || 'monthly',
         next_billing_date: editData.next_billing_date || '',
         status: editData.status || 'active',
-        notes: editData.notes || '',
       })
     } else {
       setForm({
         name: '', category: 'other', amount: '', currency: 'USD',
-        billing_cycle: 'monthly', next_billing_date: '', status: 'active', notes: '',
+        billing_cycle: 'monthly', next_billing_date: '', status: 'active',
       })
     }
   }, [editData, isOpen])
@@ -184,18 +181,6 @@ function SubscriptionModal({ isOpen, onClose, onSave, editData }) {
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-[#6B7280] dark:text-gray-400 mb-1.5">Notes (optional)</label>
-            <textarea
-              rows={2}
-              placeholder="Any notes about this subscription..."
-              value={form.notes}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              className="w-full px-4 py-2.5 border border-[#E5E7EB] dark:border-[#2A2D3A] dark:bg-[#252836] dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F97316] resize-none"
-            />
-          </div>
-
           {/* Buttons */}
           <div className="flex gap-3 pt-2">
             <button
@@ -231,7 +216,6 @@ export default function Subscriptions() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingSub, setEditingSub] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
-  const [deleteConfirmId, setDeleteConfirmId] = useState(null)
 
   // Auto-open modal if ?add=1 from Dashboard
   useEffect(() => {
@@ -319,17 +303,21 @@ export default function Subscriptions() {
     try {
       await updateSubscription(id, { status: 'cancelled' })
       await loadData()
+      setOpenMenuId(null)
     } catch (err) {
       console.error('Cancel failed:', err)
       alert('Failed to cancel subscription: ' + (err.message || 'Unknown error'))
     }
   }
 
-  const handleDelete = async (id) => {
-    await deleteSubscription(id)
-    await loadData()
-    setDeleteConfirmId(null)
-    setOpenMenuId(null)
+  const handleReactivate = async (id) => {
+    try {
+      await updateSubscription(id, { status: 'active' })
+      await loadData()
+      setOpenMenuId(null)
+    } catch (err) {
+      console.error('Reactivate failed:', err)
+    }
   }
 
   const openEdit = (sub) => {
@@ -405,7 +393,7 @@ export default function Subscriptions() {
                   <h3 className="text-lg font-semibold text-[#111827] dark:text-white">{catConfig.label}</h3>
                   <p className="text-sm text-[#6B7280] dark:text-gray-400">{items.length} subscription{items.length !== 1 ? 's' : ''}</p>
                 </div>
-                <p className="ml-4 text-sm font-semibold text-[#111827] dark:text-white">{dominantSymbol}{catTotal.toFixed(2)}/mo</p>
+                {items.length > 1 && <p className="ml-4 text-sm font-semibold text-[#111827] dark:text-white">{dominantSymbol}{catTotal.toFixed(2)}/mo</p>}
               </div>
 
               <div className="space-y-2">
@@ -414,12 +402,7 @@ export default function Subscriptions() {
                   const isCancelled = item.status === 'cancelled'
 
                   return (
-                    <div key={item.id} className="relative border border-[#F3F4F6] dark:border-[#2A2D3A] dark:bg-[#1C1F2E] rounded-2xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200">
-                      {item.status === 'active' && (
-                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium bg-[#22C55E]/[0.07] text-[#22C55E]/70 z-10 pointer-events-none">
-                          Active
-                        </div>
-                      )}
+                    <div key={item.id} className="relative border border-[#F3F4F6] dark:border-[#2A2D3A] dark:bg-[#1C1F2E] rounded-2xl overflow-hidden">
                       <button
                         onClick={() => toggleExpanded(item.id)}
                         className={`w-full px-5 py-4 flex items-center gap-4 hover:bg-[#F9FAFB] dark:hover:bg-[#252836] transition-colors ${isCancelled ? 'opacity-50' : ''}`}
@@ -447,20 +430,26 @@ export default function Subscriptions() {
                           </p>
                           <p className="text-sm text-[#6B7280] dark:text-gray-400 capitalize">{item.billing_cycle}</p>
                         </div>
-                        <div className="text-sm text-[#6B7280] dark:text-gray-400 min-w-max">
-                          <p className="text-xs text-[#9CA3AF] dark:text-gray-500">Renews</p>
-                          <p className="font-medium dark:text-gray-300">{formatDate(item.next_billing_date)}</p>
+                        <div className="text-right min-w-max">
+                          <p className="text-xs text-[#9CA3AF] dark:text-gray-500 font-medium">Renews</p>
+                          <p className="font-semibold text-[#111827] dark:text-white text-sm">{formatDate(item.next_billing_date)}</p>
                         </div>
                         <div className="text-right min-w-max">
-                          <p className="text-lg font-semibold text-[#111827] dark:text-white">{Number(item.amount) > 0 ? `${dominantSymbol}${getMonthlyInDominant(item).toFixed(2)}` : '—'}</p>
-                          <p className="text-xs text-[#9CA3AF] dark:text-gray-500">/mo</p>
-                          {Number(item.amount) > 0 && <p className="text-xs text-[#9CA3AF] dark:text-gray-500">{dominantSymbol}{getYearlyInDominant(item).toFixed(2)}/yr{(item.currency || 'USD') !== dominantCurrency && ' *'}</p>}
+                          {Number(item.amount) > 0 ? (
+                            <>
+                              <p className="font-semibold text-[#111827] dark:text-white text-sm">
+                                {dominantSymbol}{getMonthlyInDominant(item).toFixed(2)}
+                                <span className="text-xs text-[#9CA3AF] dark:text-gray-500 font-normal">/mo</span>
+                              </p>
+                              <p className="text-xs text-[#9CA3AF] dark:text-gray-500">{dominantSymbol}{getYearlyInDominant(item).toFixed(2)}/yr{(item.currency || 'USD') !== dominantCurrency && ' *'}</p>
+                            </>
+                          ) : (
+                            <p className="font-semibold text-[#D1D5DB] dark:text-gray-600">—</p>
+                          )}
                         </div>
-                        {item.status !== 'active' && (
-                          <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
-                            {item.status}
-                          </div>
-                        )}
+                        <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
+                          {item.status}
+                        </div>
                         <ChevronDown
                           size={20}
                           className={`text-[#9CA3AF] flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -492,32 +481,13 @@ export default function Subscriptions() {
                               </p>
                             </div>
                           )}
-                          {item.notes && (
-                            <div className="mb-4">
-                              <p className="text-xs text-[#6B7280] dark:text-gray-400 mb-1">Notes</p>
-                              <p className="text-sm text-[#111827] dark:text-white">{item.notes}</p>
-                            </div>
-                          )}
-                          <div className="flex gap-2 items-start flex-wrap">
+                          <div className="flex gap-2 items-center flex-wrap">
                             <button
                               onClick={() => openEdit(item)}
                               className="px-4 py-2 text-sm font-medium text-[#6B7280] dark:text-gray-400 border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-full hover:bg-[#F9FAFB] dark:hover:bg-[#1C1F2E] transition-colors"
                             >
                               Edit
                             </button>
-                            {item.status !== 'cancelled' && (
-                              <div>
-                                <button
-                                  onClick={() => handleCancel(item.id)}
-                                  className="px-4 py-2 text-sm font-medium text-[#F97316] border border-[#F97316]/30 rounded-full hover:bg-[#FFF5F0] dark:hover:bg-[#1C1F2E] transition-colors"
-                                >
-                                  Mark as Cancelled
-                                </button>
-                                <p className="text-xs text-[#9CA3AF] dark:text-gray-500 mt-1.5 max-w-xs">
-                                  This marks it as cancelled in Snipcat. You'll still need to cancel directly with the provider.
-                                </p>
-                              </div>
-                            )}
                             {/* ··· overflow menu */}
                             <div className="relative ml-auto">
                               <button
@@ -527,33 +497,20 @@ export default function Subscriptions() {
                                 ···
                               </button>
                               {openMenuId === item.id && (
-                                <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-[#1C1F2E] border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-xl shadow-lg z-10">
-                                  {deleteConfirmId === item.id ? (
-                                    <div className="p-3">
-                                      <p className="text-xs text-[#111827] dark:text-white font-medium mb-2">
-                                        Remove {item.name}? This cannot be undone.
-                                      </p>
-                                      <div className="flex gap-2">
-                                        <button
-                                          onClick={() => handleDelete(item.id)}
-                                          className="flex-1 px-2 py-1.5 text-xs font-semibold text-white bg-[#EF4444] rounded-lg hover:bg-red-600 transition-colors"
-                                        >
-                                          Remove
-                                        </button>
-                                        <button
-                                          onClick={() => setDeleteConfirmId(null)}
-                                          className="flex-1 px-2 py-1.5 text-xs font-medium text-[#6B7280] dark:text-gray-400 border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-lg hover:bg-gray-100 dark:hover:bg-[#252836] transition-colors"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div>
-                                    </div>
+                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#1C1F2E] border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-xl shadow-lg z-10">
+                                  {item.status !== 'cancelled' ? (
+                                    <button
+                                      onClick={() => handleCancel(item.id)}
+                                      className="w-full px-4 py-2.5 text-sm font-medium text-[#F97316] text-left hover:bg-[#FFF5F0] dark:hover:bg-[#252836] rounded-xl transition-colors"
+                                    >
+                                      Mark as Cancelled
+                                    </button>
                                   ) : (
                                     <button
-                                      onClick={() => setDeleteConfirmId(item.id)}
-                                      className="w-full px-4 py-2.5 text-sm font-medium text-[#EF4444] text-left hover:bg-red-50 dark:hover:bg-[#252836] rounded-xl transition-colors"
+                                      onClick={() => handleReactivate(item.id)}
+                                      className="w-full px-4 py-2.5 text-sm font-medium text-[#22C55E] text-left hover:bg-green-50 dark:hover:bg-[#252836] rounded-xl transition-colors"
                                     >
-                                      Delete
+                                      Mark as Active
                                     </button>
                                   )}
                                 </div>
@@ -579,7 +536,7 @@ export default function Subscriptions() {
     return (
       <div className="space-y-2">
         {sortedAll.map(item => (
-          <div key={item.id} className={`bg-white dark:bg-[#1C1F2E] border border-[#F3F4F6] dark:border-[#2A2D3A] rounded-2xl px-5 py-4 flex items-center gap-4 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 ${item.status === 'cancelled' ? 'opacity-50' : ''}`}>
+          <div key={item.id} className={`bg-white dark:bg-[#1C1F2E] border border-[#F3F4F6] dark:border-[#2A2D3A] rounded-2xl px-5 py-4 flex items-center gap-4 ${item.status === 'cancelled' ? 'opacity-50' : ''}`}>
             {(() => {
               const logoUrl = item.logo_url || getServiceLogo(item.name)?.logo
               return logoUrl ? (
@@ -598,15 +555,26 @@ export default function Subscriptions() {
               {getServiceInitials(item.name)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`font-medium text-[#111827] dark:text-white ${item.status === 'cancelled' ? 'line-through' : ''}`}>{item.name}</p>
+              <p className={`font-semibold text-[#111827] dark:text-white ${item.status === 'cancelled' ? 'line-through' : ''}`}>{item.name}</p>
               <p className="text-sm text-[#6B7280] dark:text-gray-400 capitalize">{CATEGORIES[item.category]?.label || 'Other'}</p>
             </div>
-            <div className="text-sm text-[#6B7280] dark:text-gray-400">{formatDate(item.next_billing_date)}</div>
-            <div className="font-semibold text-[#111827] dark:text-white">{Number(item.amount) > 0 ? `${dominantSymbol}${getMonthlyInDominant(item).toFixed(2)}/mo` : '—'}</div>
+            <div className="text-right min-w-max">
+              <p className="text-xs text-[#9CA3AF] dark:text-gray-500 font-medium">Renews</p>
+              <p className="font-semibold text-[#111827] dark:text-white text-sm">{formatDate(item.next_billing_date)}</p>
+            </div>
+            <div className="text-right min-w-max">
+              {Number(item.amount) > 0 ? (
+                <p className="font-semibold text-[#111827] dark:text-white text-sm">
+                  {dominantSymbol}{getMonthlyInDominant(item).toFixed(2)}
+                  <span className="text-xs text-[#9CA3AF] dark:text-gray-500 font-normal">/mo</span>
+                </p>
+              ) : (
+                <p className="font-semibold text-[#D1D5DB] dark:text-gray-600">—</p>
+              )}
+            </div>
             <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
               {item.status}
             </div>
-            <button onClick={() => openEdit(item)} className="text-sm text-[#F97316] font-medium hover:underline">Edit</button>
           </div>
         ))}
       </div>

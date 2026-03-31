@@ -24,6 +24,7 @@ const Reminders = () => {
   const { user } = useAuth()
   const [subscriptions, setSubscriptions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState(null)
   const [prefs, setPrefs] = useState({
     renewalReminder: true,
     renewalDays: '3 days before',
@@ -108,6 +109,11 @@ const Reminders = () => {
     }
   }
 
+  const showToast = (message) => {
+    setToast(message)
+    setTimeout(() => setToast(null), 2000)
+  }
+
   const updateDropdown = async (key, value) => {
     setPrefs(prev => ({ ...prev, [key]: value }))
 
@@ -128,6 +134,7 @@ const Reminders = () => {
 
     try {
       await upsertNotificationPrefs(user.id, { [fieldMap[key]]: dbValue })
+      showToast('Saved')
     } catch (err) {
       console.error(`Failed to save preference ${key}:`, err)
     }
@@ -169,6 +176,12 @@ const Reminders = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
+      {/* Auto-save Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-[#111827] dark:bg-white text-white dark:text-[#111827] text-sm font-medium rounded-full shadow-lg pointer-events-none animate-fade-in">
+          {toast}
+        </div>
+      )}
       {/* Sticky Header */}
       <div className="sticky top-0 z-40 bg-white/90 dark:bg-[#1C1F2E]/80 backdrop-blur-md border-b border-[#E5E7EB] dark:border-[#2A2D3A]">
         <div className="max-w-7xl mx-auto px-6 py-6">
@@ -199,7 +212,7 @@ const Reminders = () => {
                   <div
                     key={item.id}
                     className={`rounded-2xl p-5 border ${
-                      daysLeft <= 2 ? 'bg-[#EF4444]/[0.05] dark:bg-red-500/10 border-[#EF4444]/20 dark:border-red-500/20' : 'bg-white dark:bg-[#1C1F2E] border-[#F3F4F6] dark:border-[#2A2D3A] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all duration-200'
+                      daysLeft <= 2 ? 'bg-[#EF4444]/[0.05] dark:bg-red-500/10 border-[#EF4444]/20 dark:border-red-500/20' : 'bg-white dark:bg-[#1C1F2E] border-[#F3F4F6] dark:border-[#2A2D3A]'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -246,7 +259,7 @@ const Reminders = () => {
               {thisMonth.map(item => {
                 const daysLeft = getDaysLeft(item.next_billing_date)
                 return (
-                  <div key={item.id} className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] p-5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all duration-200">
+                  <div key={item.id} className="bg-white dark:bg-[#1C1F2E] rounded-2xl border border-[#F3F4F6] dark:border-[#2A2D3A] p-5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         {(() => {

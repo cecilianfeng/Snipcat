@@ -38,7 +38,7 @@ function Login() {
     handlePostLoginRedirect()
   }, [user, loading, searchParams])
 
-  // 如果已登录且没有redirect参数，直接跳转 Dashboard
+  // If already logged in with no redirect param, go straight to Dashboard
   if (!loading && user) {
     const redirectParam = searchParams.get('redirect')
     if (redirectParam === 'upgrade' || isRedirecting) {

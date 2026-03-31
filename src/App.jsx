@@ -6,31 +6,18 @@ import Dashboard from './pages/Dashboard'
 import Subscriptions from './pages/Subscriptions'
 import Reminders from './pages/Reminders'
 import Settings from './pages/Settings'
-import Onboarding from './pages/Onboarding'
 import About from './pages/About'
 import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './context/AuthContext'
 
-// Wrapper: if logged in, go to dashboard (or onboarding); otherwise show landing page
+// Wrapper: if logged in, go to dashboard; otherwise show landing page
 function HomeRoute() {
-  const { user, profile, loading } = useAuth()
+  const { user, loading } = useAuth()
   if (loading) return null
-  if (user) {
-    if (profile && !profile.onboarded) return <Navigate to="/onboarding" replace />
-    return <Navigate to="/dashboard" replace />
-  }
+  if (user) return <Navigate to="/dashboard" replace />
   return <Landing />
-}
-
-// Wrapper for onboarding: must be logged in AND not yet onboarded
-function OnboardingRoute() {
-  const { user, profile, loading } = useAuth()
-  if (loading) return null
-  if (!user) return <Navigate to="/login" replace />
-  if (profile?.onboarded) return <Navigate to="/dashboard" replace />
-  return <Onboarding />
 }
 
 export default function App() {
@@ -41,7 +28,6 @@ export default function App() {
       <Route path="/about" element={<About />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
-      <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route element={
         <ProtectedRoute>
           <Layout />

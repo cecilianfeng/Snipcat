@@ -230,6 +230,8 @@ export default function Subscriptions() {
   const [expandedItems, setExpandedItems] = useState({})
   const [modalOpen, setModalOpen] = useState(false)
   const [editingSub, setEditingSub] = useState(null)
+  const [openMenuId, setOpenMenuId] = useState(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null)
 
   // Auto-open modal if ?add=1 from Dashboard
   useEffect(() => {
@@ -324,9 +326,10 @@ export default function Subscriptions() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this subscription?')) return
     await deleteSubscription(id)
     await loadData()
+    setDeleteConfirmId(null)
+    setOpenMenuId(null)
   }
 
   const openEdit = (sub) => {
@@ -411,7 +414,12 @@ export default function Subscriptions() {
                   const isCancelled = item.status === 'cancelled'
 
                   return (
-                    <div key={item.id} className="border border-[#F3F4F6] dark:border-[#2A2D3A] dark:bg-[#1C1F2E] rounded-2xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200">
+                    <div key={item.id} className="relative border border-[#F3F4F6] dark:border-[#2A2D3A] dark:bg-[#1C1F2E] rounded-2xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200">
+                      {item.status === 'active' && (
+                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium bg-[#22C55E]/[0.07] text-[#22C55E]/70 z-10 pointer-events-none">
+                          Active
+                        </div>
+                      )}
                       <button
                         onClick={() => toggleExpanded(item.id)}
                         className={`w-full px-5 py-4 flex items-center gap-4 hover:bg-[#F9FAFB] dark:hover:bg-[#252836] transition-colors ${isCancelled ? 'opacity-50' : ''}`}
@@ -448,9 +456,11 @@ export default function Subscriptions() {
                           <p className="text-xs text-[#9CA3AF] dark:text-gray-500">/mo</p>
                           {Number(item.amount) > 0 && <p className="text-xs text-[#9CA3AF] dark:text-gray-500">{dominantSymbol}{getYearlyInDominant(item).toFixed(2)}/yr{(item.currency || 'USD') !== dominantCurrency && ' *'}</p>}
                         </div>
-                        <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
-                          {item.status}
-                        </div>
+                        {item.status !== 'active' && (
+                          <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(item.status)}`}>
+                            {item.status}
+                          </div>
+                        )}
                         <ChevronDown
                           size={20}
                           className={`text-[#9CA3AF] flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -488,7 +498,7 @@ export default function Subscriptions() {
                               <p className="text-sm text-[#111827] dark:text-white">{item.notes}</p>
                             </div>
                           )}
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 items-start flex-wrap">
                             <button
                               onClick={() => openEdit(item)}
                               className="px-4 py-2 text-sm font-medium text-[#6B7280] dark:text-gray-400 border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-full hover:bg-[#F9FAFB] dark:hover:bg-[#1C1F2E] transition-colors"
@@ -496,19 +506,59 @@ export default function Subscriptions() {
                               Edit
                             </button>
                             {item.status !== 'cancelled' && (
-                              <button
-                                onClick={() => handleCancel(item.id)}
-                                className="px-4 py-2 text-sm font-medium text-[#F97316] border border-[#F97316]/30 rounded-full hover:bg-[#FFF5F0] dark:hover:bg-[#1C1F2E] transition-colors"
-                              >
-                                Cancel Sub
-                              </button>
+                              <div>
+                                <button
+                                  onClick={() => handleCancel(item.id)}
+                                  className="px-4 py-2 text-sm font-medium text-[#F97316] border border-[#F97316]/30 rounded-full hover:bg-[#FFF5F0] dark:hover:bg-[#1C1F2E] transition-colors"
+                                >
+                                  Mark as Cancelled
+                                </button>
+                                <p className="text-xs text-[#9CA3AF] dark:text-gray-500 mt-1.5 max-w-xs">
+                                  This marks it as cancelled in Snipcat. You'll still need to cancel directly with the provider.
+                                </p>
+                              </div>
                             )}
-                            <button
-                              onClick={() => handleDelete(item.id)}
-                              className="px-4 py-2 text-sm font-medium text-[#EF4444] border border-[#EF4444]/30 rounded-full hover:bg-red-50 dark:hover:bg-[#1C1F2E] transition-colors"
-                            >
-                              Delete
-                            </button>
+                            {/* ··· overflow menu */}
+                            <div className="relative ml-auto">
+                              <button
+                                onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                                className="px-3 py-2 text-sm font-bold text-[#6B7280] dark:text-gray-400 border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-full hover:bg-[#F9FAFB] dark:hover:bg-[#1C1F2E] transition-colors leading-none"
+                              >
+                                ···
+                              </button>
+                              {openMenuId === item.id && (
+                                <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-[#1C1F2E] border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-xl shadow-lg z-10">
+                                  {deleteConfirmId === item.id ? (
+                                    <div className="p-3">
+                                      <p className="text-xs text-[#111827] dark:text-white font-medium mb-2">
+                                        Remove {item.name}? This cannot be undone.
+                                      </p>
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => handleDelete(item.id)}
+                                          className="flex-1 px-2 py-1.5 text-xs font-semibold text-white bg-[#EF4444] rounded-lg hover:bg-red-600 transition-colors"
+                                        >
+                                          Remove
+                                        </button>
+                                        <button
+                                          onClick={() => setDeleteConfirmId(null)}
+                                          className="flex-1 px-2 py-1.5 text-xs font-medium text-[#6B7280] dark:text-gray-400 border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-lg hover:bg-gray-100 dark:hover:bg-[#252836] transition-colors"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setDeleteConfirmId(item.id)}
+                                      className="w-full px-4 py-2.5 text-sm font-medium text-[#EF4444] text-left hover:bg-red-50 dark:hover:bg-[#252836] rounded-xl transition-colors"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}

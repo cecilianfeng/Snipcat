@@ -31,10 +31,10 @@ export default function Sidebar() {
   return (
     <div className="w-64 h-screen bg-[#111827] text-white flex flex-col">
       {/* Logo Section */}
-      <div className="border-b border-white/[0.08] p-6 flex items-center gap-3">
+      <NavLink to="/dashboard" className="border-b border-white/[0.08] p-6 flex items-center gap-3 hover:bg-white/[0.04] transition-colors">
         <img src="/snipcat-logo.png" alt="Snipcat" className="w-9 h-9 object-contain invert" />
         <h1 className="text-xl font-bold tracking-tight">Snipcat</h1>
-      </div>
+      </NavLink>
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">

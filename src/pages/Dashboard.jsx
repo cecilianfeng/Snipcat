@@ -57,6 +57,9 @@ const Dashboard = () => {
   const [showCurrencyInfo, setShowCurrencyInfo] = useState(false) // currency conversion info
   const [modalOpen, setModalOpen] = useState(false) // add subscription modal
   const [editingSub, setEditingSub] = useState(null) // editing mode for modal
+  const [tourStep, setTourStep] = useState(() => {
+    try { return localStorage.getItem('snipcat_onboarded') ? -1 : 0 } catch { return -1 }
+  }) // -1 = tour complete/hidden, 0-2 = active steps
 
   // ─── CURRENCY CONVERSION ───
   // Approximate exchange rates to USD (used for unified display)
@@ -447,12 +450,14 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex gap-2 flex-shrink-0">
+            {/* Track History button hidden — feature not ready
             <button
               onClick={() => handleAddAsCancelled(item)}
               className="px-3 py-1.5 border-2 border-[#F97316] text-[#F97316] rounded-full text-xs font-semibold hover:bg-[#FFF5F0] transition-colors"
             >
               Track History
             </button>
+            */}
             <button
               onClick={() => handleDismissReview(item)}
               className="px-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252836] text-[#9CA3AF] dark:text-gray-500 rounded-full text-xs font-medium hover:bg-gray-200 dark:hover:bg-[#2A2D3A] transition-colors"
@@ -470,10 +475,10 @@ const Dashboard = () => {
     if (activeReviewItems.length === 0 && pastReviewItems.length === 0) return null
     return (
       <div className={`${maxWidth} mx-auto mt-8 text-left`}>
-        {/* Active subscriptions needing review */}
+        {/* Detected Subscriptions — active items needing review */}
         {activeReviewItems.length > 0 && (
           <div className="bg-[#FFF5F0] dark:bg-[#252836] border border-[#F97316]/20 dark:border-[#F97316]/30 rounded-2xl p-6 mb-4">
-            <h3 className="font-bold text-[#111827] dark:text-white mb-1">Active subscriptions found — please confirm</h3>
+            <h3 className="font-bold text-[#111827] dark:text-white mb-1">Detected Subscriptions</h3>
             <p className="text-xs text-[#6B7280] dark:text-gray-400 mb-4">You can edit name, amount, and billing cycle before adding.</p>
             <div className="space-y-3">
               {activeReviewItems.map(item => renderActiveReviewCard(item))}
@@ -481,7 +486,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Past subscriptions — collapsible */}
+        {/* Possibly Cancelled — collapsible */}
         {pastReviewItems.length > 0 && (
           <div className="bg-[#F9FAFB] dark:bg-[#252836] border border-[#E5E7EB] dark:border-[#2A2D3A] rounded-2xl p-5">
             <button
@@ -489,7 +494,7 @@ const Dashboard = () => {
               className="flex items-center justify-between w-full text-left"
             >
               <span className="text-sm font-medium text-[#6B7280] dark:text-gray-400">
-                We also found {pastReviewItems.length} past subscription{pastReviewItems.length !== 1 ? 's' : ''}
+                Possibly Cancelled ({pastReviewItems.length})
               </span>
               <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${showPastItems ? 'rotate-180' : ''}`} />
             </button>
@@ -958,9 +963,81 @@ const Dashboard = () => {
     )
   }
 
+  const dismissTour = () => {
+    localStorage.setItem('snipcat_onboarded', '1')
+    setTourStep(-1)
+  }
+
+  const TOUR_STEPS = [
+    {
+      title: 'Welcome to Snipcat!',
+      body: "Let's find your subscriptions. Click the orange Scan Inbox button in the top-right corner to get started.",
+      indicator: '↗',
+      indicatorLabel: 'Scan Inbox',
+    },
+    {
+      title: 'Choose how far back to scan',
+      body: 'A dropdown will appear. Select 3, 6, 12, or 24 months of email history, then click Start Scan.',
+      indicator: '↗',
+      indicatorLabel: 'Time range',
+    },
+    {
+      title: 'Review your results',
+      body: 'Detected subscriptions will appear below the stats. Add them to your list or skip the ones you no longer use.',
+      indicator: '↓',
+      indicatorLabel: 'Results area',
+    },
+  ]
+
   // ─── MAIN DASHBOARD ───
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
+      {/* Guided Tour Overlay */}
+      {tourStep >= 0 && tourStep < TOUR_STEPS.length && (() => {
+        const step = TOUR_STEPS[tourStep]
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/40 z-[60] pointer-events-none" />
+            <div className="fixed bottom-8 right-8 z-[61] w-80 bg-white dark:bg-[#1C1F2E] rounded-2xl shadow-2xl border border-[#E5E7EB] dark:border-[#2A2D3A] p-5">
+              {/* Step indicator */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex gap-1.5">
+                  {TOUR_STEPS.map((_, i) => (
+                    <div key={i} className={`h-1.5 rounded-full transition-all ${i === tourStep ? 'w-6 bg-[#F97316]' : i < tourStep ? 'w-1.5 bg-[#F97316]/40' : 'w-1.5 bg-gray-200 dark:bg-[#2A2D3A]'}`} />
+                  ))}
+                </div>
+                <button onClick={dismissTour} className="text-xs text-[#9CA3AF] hover:text-[#6B7280] transition-colors">
+                  Skip tour
+                </button>
+              </div>
+              {/* Direction indicator */}
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl leading-none text-[#F97316] font-bold">{step.indicator}</span>
+                <span className="text-xs font-semibold text-[#F97316] uppercase tracking-wide">{step.indicatorLabel}</span>
+              </div>
+              <h3 className="text-base font-bold text-[#111827] dark:text-white mb-1">{step.title}</h3>
+              <p className="text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed mb-4">{step.body}</p>
+              <div className="flex gap-2">
+                {tourStep < TOUR_STEPS.length - 1 ? (
+                  <button
+                    onClick={() => setTourStep(s => s + 1)}
+                    className="flex-1 py-2 bg-[#F97316] text-white text-sm font-semibold rounded-xl hover:bg-[#EA580C] transition-colors"
+                  >
+                    Next →
+                  </button>
+                ) : (
+                  <button
+                    onClick={dismissTour}
+                    className="flex-1 py-2 bg-[#F97316] text-white text-sm font-semibold rounded-xl hover:bg-[#EA580C] transition-colors"
+                  >
+                    Got it!
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )
+      })()}
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/90 dark:bg-[#1C1F2E]/80 backdrop-blur-md border-b border-[#E5E7EB] dark:border-[#2A2D3A]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex justify-between items-center">
@@ -1158,11 +1235,18 @@ const Dashboard = () => {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-[#6B7280] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">
-                  Saved ({costView === 'monthly' ? '/mo' : '/yr'})
+                  You've Saved ({costView === 'monthly' ? '/mo' : '/yr'})
                 </p>
-                <p className="text-3xl font-bold text-[#22C55E] dark:text-green-400 mt-2">{dominantSymbol}{cancelledSavings.toFixed(2)}</p>
-                {cancelledSavings > 0 && (
-                  <p className="text-xs text-[#9CA3AF] dark:text-gray-500 mt-1">From cancelled subscriptions</p>
+                {cancelledSavings > 0 ? (
+                  <>
+                    <p className="text-3xl font-bold text-[#22C55E] dark:text-green-400 mt-2">{dominantSymbol}{cancelledSavings.toFixed(2)}</p>
+                    <p className="text-xs text-[#9CA3AF] dark:text-gray-500 mt-1">From cancelled subscriptions</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-3xl font-bold text-[#22C55E] dark:text-green-400 mt-2">{dominantSymbol}0.00</p>
+                    <p className="text-xs text-[#9CA3AF] dark:text-gray-500 mt-1">Add your subscriptions to start tracking savings</p>
+                  </>
                 )}
               </div>
               <div className="w-11 h-11 rounded-2xl bg-green-50 dark:bg-[#252836] flex items-center justify-center">

@@ -45,9 +45,13 @@ const Dashboard = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null) // subscription object to confirm delete
   const [scanning, setScanning] = useState(false)
   const [scanProgress, setScanProgress] = useState({ phase: 0, message: '', current: 0, total: 0 })
-  const [scanResult, setScanResult] = useState(null) // { confirmed, needsReview, addedCount } or { error }
-  const [scanMonths, setScanMonths] = useState(36)
-  const [reviewItems, setReviewItems] = useState([]) // items needing user confirmation
+  const [scanResult, setScanResult] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('snipkitty_scanResult')) ?? null } catch { return null }
+  })
+  const [scanMonths, setScanMonths] = useState(6)
+  const [reviewItems, setReviewItems] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('snipkitty_reviewItems')) ?? [] } catch { return [] }
+  }) // items needing user confirmation
   const [showPastItems, setShowPastItems] = useState(false)
   const [showScanOptions, setShowScanOptions] = useState(false) // scan month picker popup
   const [showCurrencyInfo, setShowCurrencyInfo] = useState(false) // currency conversion info
@@ -107,7 +111,14 @@ const Dashboard = () => {
   }
 
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      // Clear persisted scan state on logout
+      localStorage.removeItem('snipkitty_scanResult')
+      localStorage.removeItem('snipkitty_reviewItems')
+      setScanResult(null)
+      setReviewItems([])
+      return
+    }
     loadSubscriptions()
   }, [user])
 
@@ -206,7 +217,12 @@ const Dashboard = () => {
       const refreshedNames = new Set(refreshedSubs.map(s => s.name.toLowerCase()))
       const reviewFiltered = needsReview.filter(s => !refreshedNames.has(s.name.toLowerCase()))
       setReviewItems(reviewFiltered)
-      setScanResult({ addedCount, updatedCount, confirmedTotal: confirmed.length, reviewCount: reviewFiltered.length })
+      const result = { addedCount, updatedCount, confirmedTotal: confirmed.length, reviewCount: reviewFiltered.length }
+      setScanResult(result)
+      try {
+        localStorage.setItem('snipkitty_scanResult', JSON.stringify(result))
+        localStorage.setItem('snipkitty_reviewItems', JSON.stringify(reviewFiltered))
+      } catch (_) { /* ignore storage errors */ }
     } catch (err) {
       console.error('Scan failed:', err)
       // Ensure error message is a clean, user-friendly string (never raw API data)
@@ -868,10 +884,10 @@ const Dashboard = () => {
                 <p className="text-sm font-semibold text-[#111827] dark:text-white mb-3 text-left">How far back should we scan?</p>
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   {[
+                    { value: 3, label: '3 months' },
                     { value: 6, label: '6 months' },
                     { value: 12, label: '1 year' },
                     { value: 24, label: '2 years' },
-                    { value: 36, label: '3 years' },
                   ].map(opt => (
                     <button
                       key={opt.value}
@@ -977,10 +993,10 @@ const Dashboard = () => {
                   <p className="text-sm font-semibold text-[#111827] dark:text-white mb-3">How far back should we scan?</p>
                   <div className="grid grid-cols-2 gap-2 mb-4">
                     {[
+                      { value: 3, label: '3 months' },
                       { value: 6, label: '6 months' },
                       { value: 12, label: '1 year' },
                       { value: 24, label: '2 years' },
-                      { value: 36, label: '3 years' },
                     ].map(opt => (
                       <button
                         key={opt.value}

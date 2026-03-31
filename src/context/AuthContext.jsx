@@ -74,9 +74,16 @@ export function AuthProvider({ children }) {
   }
 
   // Get Google provider token for Gmail API calls
+  // Attempts a session refresh if provider_token is missing (common on first login)
   const getGoogleToken = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    return session?.provider_token || null
+    if (session?.provider_token) return session.provider_token
+    // Token missing — try refreshing the session once
+    try {
+      const { data: refreshed } = await supabase.auth.refreshSession()
+      if (refreshed?.session?.provider_token) return refreshed.session.provider_token
+    } catch (_) { /* ignore refresh errors */ }
+    return null
   }
 
   // Sign out
